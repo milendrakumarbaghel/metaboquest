@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-metaboquest}
+      POSTGRES_USER: ${DB_USERNAME:-metaboquest}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-metaboquest}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - metaboquest_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-metaboquest} -d ${DB_NAME:-metaboquest}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-metaboquest}
+      DB_USERNAME: ${DB_USERNAME:-metaboquest}
+      DB_PASSWORD: ${DB_PASSWORD:-metaboquest}
+      SERVER_PORT: 8080
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      STEER_WEBSITE_URL: ${STEER_WEBSITE_URL:-https://steerclub.com}
+      RATE_LIMIT_HASH_SECRET: ${RATE_LIMIT_HASH_SECRET:-local-compose-rate-limit-key}
+      RESULT_TOKEN_SECRET: ${RESULT_TOKEN_SECRET:-local-compose-result-token-secret-change-me}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  metaboquest_postgres:
