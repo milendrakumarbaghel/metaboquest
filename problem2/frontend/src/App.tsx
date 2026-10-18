@@ -1,122 +1,25 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { Component, useEffect, useRef, type ReactNode } from 'react'
+import { useApp } from './context/store'
+import { demo } from './api/client'
+import { usePollBatch } from './hooks/usePollBatch'
+import Header from './components/Header'
+import Toast from './components/Toast'
+import PapersView from './components/PapersView'
+import DoctorReviewView from './components/DoctorReviewView'
+import MediaStudioView from './components/MediaStudioView'
+import SchedulingView from './components/SchedulingView'
+import EffortAuditView from './components/EffortAuditView'
 import './App.css'
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+class ViewBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? <div role="alert" className="error">This view could not display the returned data. Check the backend response format, then switch tabs to retry.</div> : this.props.children }
 }
-
-export default App
+export default function App() {
+  const { state } = useApp(); const main = useRef<HTMLElement>(null)
+  usePollBatch()
+  useEffect(() => { main.current?.focus() }, [state.activeTab])
+  return <><a className="skip-link" href="#main">Skip to workspace</a>{demo && <div className="demo-banner">Demo mode — using sample data. Remove ?demo=true for live API.</div>}<div className="app-shell"><Header />{state.offline && <div className="offline-banner" role="alert">Unable to reach Science Studio. Check the configured API URL and that the Science Studio service is running, then retry.</div>}{state.errors.demo && <div className="error" role="alert">{state.errors.demo}</div>}<main id="main" ref={main} tabIndex={-1}><ViewBoundary key={`${state.activeTab}-${state.activePackageId}`}>
+    {state.activeTab === 'papers' && <PapersView />}{state.activeTab === 'review' && <DoctorReviewView key={state.activePackageId} />}{state.activeTab === 'studio' && <MediaStudioView key={state.activePackageId} />}{state.activeTab === 'schedule' && <SchedulingView key={state.activePackageId} />}{state.activeTab === 'effort' && <EffortAuditView key={state.activePackageId} />}
+  </ViewBoundary></main><footer><span><strong>steer</strong> Science Studio</span><p>Doctor-led · Evidence-first</p><span className="tiny-label">FROM PAPER TO PURPOSE.</span></footer></div><Toast /></>
+}

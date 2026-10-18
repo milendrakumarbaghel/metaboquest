@@ -1,0 +1,43 @@
+[
+  {
+    "name": "All five demo tabs, approval gates, clinical review, all media previews and JSON export",
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "Scheduling validation, platform selection, hashtags, saved edits and simulated publish",
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "Demo paper import, PDF upload, title, English generation, batch processing and paper switching",
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "Claim rejection and request-changes package decisions preserve approval gates",
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "Responsive navigation on all tabs at 320, 390, 768 and 1280px",
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "Intercepted API failures: offline recovery, generation, rendering, schedule and effort retries",
+    "passed": true,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    ]
+  },
+  {
+    "name": "English-only generation payloads and workspace state preserve the backend DTO contract",
+    "passed": true,
+    "consoleErrors": []
+  }
+]
