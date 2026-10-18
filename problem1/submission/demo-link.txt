@@ -1,1 +1,4 @@
-TODO: Replace this line with the live URL after deploying frontend/ to Vercel (see SUBMISSION.md, "Deploy"). Not deployed yet. Until then, submit playable-ad.html (or playable-ad.zip) as the HTML artifact.
+MetaboQuest (Problem Statement 1):
+Live Playable Experience (Vercel): https://metaboquest.vercel.app
+Live Backend API (Render): https://metaboquest-problem1-backendxx.onrender.com/api/v1
+Local Dev: http://localhost:5173
