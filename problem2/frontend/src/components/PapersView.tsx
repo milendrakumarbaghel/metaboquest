@@ -1,248 +1,48 @@
-import React, { useState } from 'react';
-import type { ResearchPaper } from '../types';
-
-interface PapersViewProps {
-  papers: ResearchPaper[];
-  activePaper: ResearchPaper;
-  onSelectPaper: (paper: ResearchPaper) => void;
-  onUploadMockPdf: (file: File) => void;
-  onImportUrl: (url: string) => void;
-  onTriggerGenerate: () => void;
-  isGenerating: boolean;
+import { date } from './utils'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useApp } from '../context/store'
+import { papersApi } from '../api/papers'
+import { packagesApi } from '../api/packages'
+import { demo, message, safeLink } from '../api/client'
+import { useOperation } from '../hooks/useOperation'
+import { useToast } from '../hooks/useToast'
+import { Badge, InlineError, Skeleton } from './ui'
+const examples = [['NEJM LOOK-AHEAD', 'https://www.nejm.org/doi/full/10.1056/NEJMoa1105816'], ['Lancet Diabetes', 'https://www.thelancet.com/journals/landia/article/PIIS2213-8587(21)00028-1/fulltext'], ['PubMed GLP-1', 'https://pubmed.ncbi.nlm.nih.gov/41491349/']]
+export default function PapersView() {
+  const { state, dispatch } = useApp(); const toast = useToast()
+  const ingest = useOperation('ingest'); const generate = useOperation('generate'); const batchOp = useOperation('batch-start'); const refresh = useOperation('paper-refresh')
+  const [url, setUrl] = useState(''); const [title, setTitle] = useState(''); const [audience, setAudience] = useState('Adults in India curious about metabolic health'); const [selected, setSelected] = useState<string[]>([])
+  const [stage, setStage] = useState(0); const [batchRetry, setBatchRetry] = useState(0)
+  const file = useRef<HTMLInputElement>(null); const urlInput = useRef<HTMLInputElement>(null)
+  const paper = state.papers.find(p => p.id === state.activePaperId)
+  const batch = state.batch
+  useEffect(() => { if (!generate.busy) return; const interval = setInterval(() => setStage(n => (n + 1) % 3), 3500); return () => clearInterval(interval) }, [generate.busy])
+  // Ingestion may be asynchronous; keep a queued paper fresh without creating it twice.
+  useEffect(() => {
+    if (!paper || paper.status !== 'QUEUED') return
+    const controller = new AbortController()
+    const timer = setTimeout(() => { void papersApi.get(paper.id, controller.signal).then(value => { if (!controller.signal.aborted) dispatch({ type: 'paper', paper: value }) }).catch(e => { if (!controller.signal.aborted) dispatch({ type: 'error', key: 'paper-refresh', value: message(e) }) }) }, 3000)
+    return () => { controller.abort(); clearTimeout(timer) }
+  }, [paper, dispatch])
+  useEffect(() => {
+    if (!batch || batch.status === 'RUNNING') return
+    const controller = new AbortController()
+    void Promise.allSettled(batch.packageIds.map(id => packagesApi.get(id, controller.signal))).then(results => {
+      if (controller.signal.aborted) return
+      let failed = false
+      results.forEach(result => { if (result.status === 'fulfilled') { dispatch({ type: 'paper', paper: result.value.paper }); dispatch({ type: 'package', pkg: result.value }) } else failed = true })
+      dispatch({ type: 'error', key: 'batch-results', value: failed ? 'Some completed packages could not be loaded. Retry to retrieve them.' : null })
+    })
+    return () => controller.abort()
+  }, [batch, batchRetry, dispatch])
+  function importUrl(e: FormEvent) { e.preventDefault(); void ingest.run(async () => { if (!safeLink(url) || !/^https?:\/\//i.test(url)) throw new Error('Enter a complete http:// or https:// research URL.'); const value = await papersApi.fromUrl(url.trim(), title); dispatch({ type: 'paper', paper: value, select: true }); toast('Paper imported.', 'success'); setUrl('') }) }
+  const busy = ingest.busy || generate.busy || batchOp.busy
+  return <div className="paper-layout"><aside className="library card"><div className="section-title"><h2>Paper library</h2><span className="count">{state.papers.length}</span></div><p className="muted">Your source of truth starts here.</p><div className="library-actions"><button className="primary" disabled={busy} onClick={() => file.current?.click()}>↑ Upload PDF</button><button className="secondary" onClick={() => urlInput.current?.focus()}>↗ Import URL</button></div><input className="sr-only" ref={file} type="file" accept=".pdf,application/pdf" aria-label="Upload research PDF" onChange={e => { const chosen = e.target.files?.[0]; e.target.value = ''; if (chosen) void ingest.run(async () => { if (!chosen.name.toLowerCase().endsWith('.pdf')) throw new Error('Please choose a PDF file.'); const value = await papersApi.upload(chosen, title); dispatch({ type: 'paper', paper: value, select: true }); toast('PDF uploaded.', 'success') }) }} />
+    <form className="import-form" onSubmit={importUrl}><label>Paper title <span className="muted">(optional)</span><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Use the paper’s original title" /></label><label>Research URL<input ref={urlInput} type="url" required value={url} onChange={e => setUrl(e.target.value)} placeholder="https://journal.org/paper" /></label><button className="secondary" disabled={busy || !url.trim()}>{ingest.busy ? 'Ingesting…' : 'Import paper →'}</button></form><InlineError text={ingest.error} />{ingest.busy && <Skeleton label="Ingesting…" />}
+    <div className="paper-list">{!state.papers.length && <p className="library-empty">No papers yet. Upload a PDF or import a URL.</p>}{state.papers.map(p => <div className={`paper-item ${paper?.id === p.id ? 'selected' : ''}`} key={p.id}><label className="paper-checkbox"><input type="checkbox" aria-label={`Include ${p.title} in batch`} checked={selected.includes(p.id)} onChange={e => setSelected(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} /></label><button className="paper-card" onClick={() => dispatch({ type: 'select', paperId: p.id })}><div><Badge value={p.sourceType} /><Badge value={p.status} /></div><strong title={p.title}>{p.title.length > 60 ? `${p.title.slice(0, 60)}…` : p.title}</strong><small>{p.pageCount} pages · {date(p.createdAt)}</small></button></div>)}</div>
+    {state.papers.length > 0 && <button className="secondary full" disabled={selected.length < 2 || busy || batch?.status === 'RUNNING'} onClick={() => void batchOp.run(async () => { const value = await packagesApi.batch(selected, { language: state.activeLanguage, audience }); dispatch({ type: 'batch', batch: value }); toast('Batch accepted.', 'success') })}>Batch process {selected.length} papers →</button>}<InlineError text={batchOp.error} />
+    </aside><div className="paper-workspace"><div className="intro"><span className="eyebrow">01 / PAPERS & EVIDENCE</span><h1>Good content begins<br />with good evidence.</h1><p>Turn a research paper into a story worth sharing.<br />With the science intact, and a doctor in the loop.</p></div>
+    {!paper ? <section className="welcome card"><div className="paper-illustration" aria-hidden="true"><div className="sheet"><span>RESEARCH</span><i /><i /><i /><b>✳</b><i /><i /></div><span className="illustration-seal">↗</span></div><h2>One paper. A whole new conversation.</h2><p>Upload a PDF or bring a research URL. We’ll help you move<br />from evidence to an Instagram-ready content package.</p><div className="workflow-mini"><span>01<br /><strong>Bring the research</strong></span><span>02<br /><strong>Review the claims</strong></span><span>03<br /><strong>Share the science</strong></span></div><div className="example-links"><span className="tiny-label">HAVE A LOOK AT AN EXAMPLE</span>{examples.map(([name, value]) => <button key={name} onClick={() => { setUrl(value); urlInput.current?.focus() }}>{name} ↗</button>)}</div></section> : <section className="card paper-detail"><div className="section-title"><Badge value={paper.sourceType} /><Badge value={paper.status} /></div><h2>{paper.title}</h2><p className="muted">{paper.pageCount} pages · Imported {date(paper.createdAt)}</p>{paper.sourceUrl && safeLink(paper.sourceUrl) && <a className="source-link" href={safeLink(paper.sourceUrl)} target="_blank" rel="noreferrer">Original research URL ↗</a>}<div className="actions">{!demo && safeLink(paper.sourceDownloadUrl) && <a className="secondary" href={safeLink(paper.sourceDownloadUrl)} target="_blank" rel="noreferrer">View source ↗</a>}<button className="text-button" disabled={refresh.busy} onClick={() => void refresh.run(async () => { dispatch({ type: 'paper', paper: await papersApi.get(paper.id) }) })}>↻ Refresh paper</button></div>{demo && <p className="note">Sample paper for demonstration. No original research file is attached.</p>}<InlineError text={paper.failureReason || refresh.error} /><hr /><div className="section-title"><h3>Shape your content package</h3><span className="tiny-label">{state.activeLanguage.toUpperCase()}</span></div><p className="muted">Content is generated in English. Tell us who you’re speaking to.</p><label>Audience<input value={audience} onChange={e => setAudience(e.target.value)} placeholder="Adults in India curious about metabolic health" /></label><button className="primary generate" disabled={busy || paper.status !== 'EXTRACTED' || !audience.trim()} onClick={() => void generate.run(async () => { const pkg = await packagesApi.generate(paper.id, { language: state.activeLanguage, audience: audience.trim() }); dispatch({ type: 'package', pkg, activate: true }); dispatch({ type: 'tab', tab: 'review' }); toast('Package generated. Ready for doctor review.', 'success') })}>{generate.busy ? 'Generating content…' : '🚀 Generate content package'}<span>→</span></button>{generate.busy && <p className="progress-copy" role="status">{['Extracting claims…', 'Translating to Steer voice…', 'Building assets…'][stage]} <span>Waiting for the backend to finish.</span></p>}<InlineError text={generate.error} /><p className="note">Every claim goes through doctor review before media exports unlock.</p></section>}
+    {batch && <section className="card batch-panel"><div className="section-title"><h3>Batch progress</h3><Badge value={batch.status} /></div><progress max={batch.requestedCount || 1} value={batch.completedCount + batch.failedCount} aria-label="Batch papers processed" /><p>{batch.completedCount} of {batch.requestedCount} completed · {batch.failedCount} failed · {Math.round((batch.completedCount + batch.failedCount) / (batch.requestedCount || 1) * 100)}% processed</p><InlineError text={state.errors['batch-poll']} /><InlineError text={state.errors['batch-results']} retry={() => setBatchRetry(n => n + 1)} />{Object.entries(batch.errors).map(([id, error]) => <p className="error" key={id}>{state.papers.find(p => p.id === id)?.title || id}: {error}</p>)}<div className="actions">{batch.packageIds.map((id, index) => <button key={id} className="secondary" disabled={!state.packages[id]} onClick={() => { dispatch({ type: 'package', pkg: state.packages[id], activate: true }); dispatch({ type: 'tab', tab: 'review' }) }}>Review package {index + 1}</button>)}</div></section>}
+    <div className="principles"><span>✳ Evidence-linked claims</span><span>⊕ Doctor-led approval</span><span>✳ English content</span></div></div></div>
 }
-
-export const PapersView: React.FC<PapersViewProps> = ({
-  papers,
-  activePaper,
-  onSelectPaper,
-  onUploadMockPdf,
-  onImportUrl,
-  onTriggerGenerate,
-  isGenerating
-}) => {
-  const [activePageIndex, setActivePageIndex] = useState<number>(1);
-  const [urlInput, setUrlInput] = useState<string>('');
-  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
-
-  const handleUrlSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!urlInput.trim()) return;
-    onImportUrl(urlInput.trim());
-    setFeedbackMsg(`Successfully ingested research article from: ${urlInput}`);
-    setUrlInput('');
-    setTimeout(() => setFeedbackMsg(null), 4000);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      onUploadMockPdf(file);
-      setFeedbackMsg(`Uploaded research PDF: ${file.name} (SHA-256 verified)`);
-      setTimeout(() => setFeedbackMsg(null), 4000);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      
-      {/* Top Banner: Ingestion & Control */}
-      <div className="bg-[#F8F2EB] border border-[#E6CBBD] rounded-xl p-5 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-serif text-[#661414] font-bold">Scientific Paper Ingestion & Traceability</h2>
-            <p className="text-xs text-[#351D1D] mt-1">
-              Upload scientific research PDFs or public article links. Our parser extracts page text, hashes the source for provenance, and builds a quote-level citation index.
-            </p>
-          </div>
-          <button
-            onClick={onTriggerGenerate}
-            disabled={isGenerating}
-            className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-[#C04E2A] hover:bg-[#a63d1e] text-white text-xs font-semibold shadow-sm transition-colors whitespace-nowrap disabled:opacity-50"
-          >
-            {isGenerating ? (
-              <span className="flex items-center gap-2">
-                <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
-                Extracting Claims...
-              </span>
-            ) : (
-              '⚡ Run AI Pipeline & Extract Claims'
-            )}
-          </button>
-        </div>
-
-        {feedbackMsg && (
-          <div className="mt-3 p-2.5 bg-[#E6CBBD]/60 text-[#661414] text-xs rounded-md border border-[#E6CBBD] font-medium">
-            ✓ {feedbackMsg}
-          </div>
-        )}
-
-        {/* Input Forms: File Upload & URL Ingest */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-[#E6CBBD]">
-          {/* File Upload Box */}
-          <div className="border border-dashed border-[#B58777] rounded-lg p-3 bg-[#F5EBDF]/70 text-center">
-            <label className="cursor-pointer block">
-              <span className="text-xs font-semibold text-[#661414] block">📁 Upload Research Paper (PDF)</span>
-              <span className="text-[11px] text-[#795B50] block mt-0.5">Max 20MB • PDFBox Text & Page Extraction</span>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <span className="mt-2 inline-block px-3 py-1 bg-[#F8F2EB] hover:bg-[#E6CBBD] text-xs font-medium text-[#351D1D] border border-[#E6CBBD] rounded-md transition-colors">
-                Choose PDF File
-              </span>
-            </label>
-          </div>
-
-          {/* URL Ingest Box */}
-          <div className="border border-[#E6CBBD] rounded-lg p-3 bg-[#F5EBDF]/70">
-            <form onSubmit={handleUrlSubmit} className="space-y-2">
-              <span className="text-xs font-semibold text-[#661414] block">🔗 Ingest Article Link (HTTPS)</span>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  placeholder="https://pubmed.ncbi.nlm.nih.gov/..."
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  className="w-full text-xs bg-[#F8F2EB] border border-[#E6CBBD] rounded px-2.5 py-1.5 text-[#351D1D] focus:outline-none focus:ring-1 focus:ring-[#C04E2A]"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 bg-[#C04E2A] text-white text-xs font-medium rounded hover:bg-[#a63d1e] transition-colors"
-                >
-                  Ingest
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Papers Library vs PDF Page Viewer */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left: Ingested Papers Catalog */}
-        <div className="lg:col-span-1 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#661414] flex items-center justify-between">
-            <span>Demonstration Papers Library ({papers.length})</span>
-            <span className="text-[10px] text-[#B58777] font-normal">Real clinical studies</span>
-          </h3>
-
-          <div className="space-y-2.5">
-            {papers.map((paper) => {
-              const isSelected = paper.id === activePaper.id;
-              return (
-                <div
-                  key={paper.id}
-                  onClick={() => {
-                    onSelectPaper(paper);
-                    setActivePageIndex(0);
-                  }}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#F8F2EB] border-[#C04E2A] shadow-xs ring-1 ring-[#C04E2A]'
-                      : 'bg-[#F8F2EB]/60 border-[#E6CBBD] hover:bg-[#F8F2EB] hover:border-[#B58777]'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-[#C04E2A] bg-[#E6CBBD]/50 px-1.5 py-0.5 rounded">
-                      {paper.sourceType} • {paper.pageCount} Pages
-                    </span>
-                    <span className="text-[10px] text-[#B58777]">
-                      {paper.doi ? `DOI: ${paper.doi}` : `PMID: ${paper.pmid}`}
-                    </span>
-                  </div>
-
-                  <h4 className="text-xs font-bold text-[#351D1D] mt-2 line-clamp-2 leading-relaxed font-serif">
-                    {paper.title}
-                  </h4>
-
-                  <p className="text-[11px] text-[#795B50] mt-1 line-clamp-1 italic">
-                    {paper.journal}
-                  </p>
-
-                  <div className="mt-2.5 pt-2 border-t border-[#E6CBBD]/60 flex items-center justify-between text-[10px] text-[#B58777]">
-                    <span className="truncate max-w-[170px]">SHA-256: {paper.sha256.substring(0, 16)}...</span>
-                    {isSelected && <span className="font-bold text-[#661414]">Active Document ▶</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: Authentic PDF Page Viewer & Evidence Highlighter */}
-        <div className="lg:col-span-2 bg-[#F8F2EB] border border-[#E6CBBD] rounded-xl p-5 shadow-xs flex flex-col">
-          
-          {/* Viewer Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E6CBBD]">
-            <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#C04E2A]">
-                Source Document Viewer
-              </span>
-              <h3 className="text-sm font-bold text-[#661414] font-serif mt-0.5 line-clamp-1">
-                {activePaper.title}
-              </h3>
-              <p className="text-[11px] text-[#B58777]">
-                {activePaper.journal} • {activePaper.doi ? `DOI: ${activePaper.doi}` : `PMID: ${activePaper.pmid}`}
-              </p>
-            </div>
-
-            {/* Page Selector Tabs */}
-            <div className="flex items-center gap-1.5 self-start sm:self-center">
-              <span className="text-xs font-medium text-[#795B50] mr-1">Page:</span>
-              {activePaper.pages.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActivePageIndex(idx)}
-                  className={`w-7 h-7 rounded text-xs font-bold transition-colors ${
-                    activePageIndex === idx
-                      ? 'bg-[#661414] text-white'
-                      : 'bg-[#F5EBDF] text-[#351D1D] border border-[#E6CBBD] hover:bg-[#E6CBBD]'
-                  }`}
-                >
-                  {idx + 1}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Page Metadata Bar */}
-          <div className="flex items-center justify-between text-[11px] text-[#795B50] py-2 px-3 bg-[#F5EBDF] rounded-md my-3 border border-[#E6CBBD]">
-            <span>
-              Viewing <strong>Page {activePageIndex + 1} of {activePaper.pageCount}</strong>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
-              Grounded Evidence Ground-Truth
-            </span>
-            <a
-              href={activePaper.sourceUrl || '#'}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[#C04E2A] hover:underline font-medium"
-            >
-              Original Source ↗
-            </a>
-          </div>
-
-          {/* Extracted Page Text Box */}
-          <div className="flex-1 min-h-[380px] max-h-[460px] overflow-y-auto p-4 bg-white border border-[#E6CBBD] rounded-lg font-mono text-xs leading-relaxed text-[#351D1D] whitespace-pre-wrap selection:bg-[#E6CBBD]">
-            {activePaper.pages[activePageIndex] || 'No text extracted for this page.'}
-          </div>
-
-          {/* Evidence Highlight Note */}
-          <div className="mt-3 p-3 bg-[#F5EBDF] border border-[#E6CBBD] rounded-lg flex items-start gap-2.5">
-            <span className="text-base text-[#C04E2A]">🔍</span>
-            <div className="text-[11px] text-[#351D1D]">
-              <strong>Quote-Traceability Guarantee:</strong> Every claim extracted by the AI pipeline must match an exact verbatim substring from these stored pages. No ungrounded hallucinations or unverified figures can pass to the doctor review gate.
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-  );
-};

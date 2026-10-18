@@ -1,206 +1,45 @@
-import React, { useState } from 'react';
-import type { ContentPackage, ResearchPaper } from '../types';
-
-interface SchedulingViewProps {
-  contentPackage: ContentPackage;
-  paper?: ResearchPaper;
+import { date } from './utils'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useApp, usePackage } from '../context/store'
+import { scheduleApi } from '../api/schedule'
+import { demo, message } from '../api/client'
+import { useOperation } from '../hooks/useOperation'
+import { useToast } from '../hooks/useToast'
+import type { CaptionPayload, Platform, ScheduledPostView } from '../types'
+import { Badge, Dialog, Empty, InlineError, Skeleton } from './ui'
+const platforms: { value: Platform; label: string; icon: string; format: string }[] = [{ value: 'INSTAGRAM_FEED', label: 'Instagram Feed', icon: '▧', format: 'portrait' }, { value: 'INSTAGRAM_REELS', label: 'Instagram Reels', icon: '▷', format: 'story' }, { value: 'INSTAGRAM_STORIES', label: 'Instagram Stories', icon: '✧', format: 'story' }, { value: 'FACEBOOK', label: 'Facebook', icon: 'f', format: 'square' }]
+function localDate(iso: string) { const value = new Date(iso); return new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) }
+export default function SchedulingView() {
+  const pkg = usePackage(); const { state, dispatch } = useApp(); const toast = useToast(); const operation = useOperation('schedule')
+  const payload = pkg?.assets.find(a => a.type === 'CAPTION')?.payload as CaptionPayload | undefined
+  const [platform, setPlatform] = useState<Platform>('INSTAGRAM_FEED'); const [time, setTime] = useState(''); const [caption, setCaption] = useState(payload?.text ?? ''); const [hashtags, setHashtags] = useState<string[]>(payload?.hashtags ?? []); const [tag, setTag] = useState(''); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [retry, setRetry] = useState(0); const [confirm, setConfirm] = useState(false)
+  const id = pkg?.id; const approved = pkg?.status === 'APPROVED'
+  useEffect(() => {
+    if (!id || !approved) return
+    const controller = new AbortController()
+    scheduleApi.get(id, controller.signal).then(value => {
+      if (controller.signal.aborted) return
+      if (value) { dispatch({ type: 'schedule', schedule: value }); setPlatform(value.platform); setTime(localDate(value.scheduledFor)); setCaption(value.caption); setHashtags(value.hashtags) }
+      setLoading(false)
+    }).catch(e => { if (!controller.signal.aborted) { setError(message(e)); setLoading(false) } })
+    return () => controller.abort()
+  }, [id, approved, dispatch, retry])
+  if (!pkg) return <Empty title="A story before a schedule.">Choose a generated package first.</Empty>
+  if (!approved) return <div className="locked card"><span aria-hidden="true">◷</span><h1>Approval comes first.</h1><p>Doctor approval required before scheduling or publishing.</p><button className="primary" onClick={() => dispatch({ type: 'tab', tab: 'review' })}>Go to doctor review →</button></div>
+  const existing = state.schedules[pkg.id]
+  const selectedPlatform = platforms.find(p => p.value === platform)!
+  const dirty = !!existing && (!!tag.trim() || platform !== existing.platform || caption !== existing.caption || hashtags.join(' ') !== existing.hashtags.join(' ') || time !== localDate(existing.scheduledFor))
+  function addTag() { const normalized = tag.trim().replace(/^#+/, ''); if (normalized && !/\s/.test(normalized)) { const value = `#${normalized}`; setHashtags(tags => tags.includes(value) ? tags : [...tags, value]); setTag('') } else if (normalized) toast('Use one hashtag without spaces.', 'error') }
+  function save(e: FormEvent) { e.preventDefault(); void operation.run(async () => {
+    const when = new Date(time); if (!time || Number.isNaN(when.valueOf()) || when.valueOf() <= Date.now()) throw new Error('Choose a future date and time.')
+    if (tag.trim()) throw new Error('Add the pending hashtag or clear it before scheduling.')
+    const saved = await scheduleApi.save(pkg!.id, { platform, scheduledFor: when.toISOString(), caption, hashtags, mediaFormat: selectedPlatform.format })
+    dispatch({ type: 'schedule', schedule: saved })
+    const confirmed = await scheduleApi.get(pkg!.id); if (!confirmed) throw new Error('The schedule was saved, but confirmation was empty. Refresh to verify before publishing.')
+    dispatch({ type: 'schedule', schedule: confirmed }); toast(demo ? 'Sample schedule saved. Nothing will be posted.' : 'Schedule saved and confirmed.', 'success')
+  }) }
+  async function publish() { if (!existing) return; const published = await scheduleApi.publish(pkg!.id); dispatch({ type: 'schedule', schedule: published }); setConfirm(false); toast(demo ? 'Demo publication simulated. Nothing was posted.' : published.status === 'PUBLISHED' ? 'The backend confirmed publication.' : 'Publication status updated.', published.status === 'FAILED' ? 'error' : 'success') }
+  function statusCard(value: ScheduledPostView) { return <section className="card schedule-status"><div className="section-title"><h2>{demo ? 'Sample schedule' : 'Your schedule'}</h2><Badge value={value.status} /></div><strong>{platforms.find(p => p.value === value.platform)?.label ?? value.platform}</strong><p>{date(value.scheduledFor)}</p>{value.status === 'PUBLISHED' && <><p>Published: {value.publishedAt ? date(value.publishedAt) : 'Time not provided'}</p>{value.metaPublishedId && <p className="muted">Publication ID: {value.metaPublishedId}</p>}</>}{value.status === 'FAILED' && <p className="error">The backend reported publication failure. No detailed failure reason was included. Check server configuration before retrying.</p>}<p className="note">{demo ? 'Simulation only. No social account is contacted.' : 'Status is reported by the backend. Publication requires a configured social account.'}</p></section> }
+  return <div><div className="page-heading"><div><span className="eyebrow">04 / PUBLISH & SCHEDULE</span><h1>Let the science meet its audience.</h1><p>Pick a platform, refine the caption, and choose your moment.</p></div></div>{loading ? <Skeleton label="Checking existing schedule…" /> : error ? <InlineError text={error} retry={() => { setError(''); setLoading(true); setRetry(n => n + 1) }} /> : <div className="schedule-layout"><form className="card schedule-form" onSubmit={save}><fieldset disabled={operation.busy || existing?.status === 'PUBLISHED'}><legend>Where will the story live?</legend><div className="platforms">{platforms.map(p => <label key={p.value} className={platform === p.value ? 'selected' : ''}><input type="radio" name="platform" value={p.value} checked={platform === p.value} onChange={() => setPlatform(p.value)} /><span aria-hidden="true">{p.icon}</span>{p.label}</label>)}</div><label>Schedule date & time<input type="datetime-local" required value={time} onChange={e => setTime(e.target.value)} /></label><p className="note">Your local timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Sent to the backend as UTC.</p><label>Caption<textarea rows={6} value={caption} onChange={e => setCaption(e.target.value)} /></label><label>Hashtags<div className="tag-input"><input value={tag} onChange={e => setTag(e.target.value)} placeholder="Type a tag and press Enter" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }} /><button type="button" className="secondary" onClick={addTag}>Add</button></div></label><div className="tags">{hashtags.map(value => <span key={value}>{value}<button type="button" aria-label={`Remove ${value}`} onClick={() => setHashtags(tags => tags.filter(t => t !== value))}>×</button></span>)}</div><p className="muted">Media format: {selectedPlatform.format}</p><button className="primary" disabled={operation.busy}>{operation.busy ? 'Saving…' : existing ? 'Save schedule' : 'Schedule post'} →</button></fieldset><InlineError text={operation.error} /></form><aside>{existing ? statusCard(existing) : <section className="card"><span className="eyebrow">YOUR NEXT PUBLICATION</span><h2>Not yet scheduled</h2><p className="muted">Save a schedule to prepare this package for publishing.</p></section>}<section className="card publish-card"><h2>Ready right now?</h2><p>Publish the saved schedule immediately.</p><button className="primary" disabled={!existing || dirty || operation.busy || existing.status === 'PUBLISHED'} onClick={() => setConfirm(true)}>Publish now ↗</button>{dirty && <p className="note">Save your edits before publishing.</p>}{!existing && <p className="note">Create a schedule first so the backend has a platform and caption.</p>}</section></aside></div>}
+    {confirm && existing && <Dialog title={demo ? 'Simulate publication?' : 'Publish this package now?'} close={() => { if (!operation.busy) setConfirm(false) }}><p>{demo ? 'This updates sample data only.' : 'This sends the saved content to the configured social account immediately.'}</p><p><strong>{platforms.find(p => p.value === existing.platform)?.label}</strong></p><blockquote>{existing.caption}</blockquote><div className="tags">{existing.hashtags.map(t => <span key={t}>{t}</span>)}</div><InlineError text={operation.error} /><button className="primary" disabled={operation.busy} onClick={() => void operation.run(publish)}>{operation.busy ? 'Publishing…' : demo ? 'Simulate publication' : 'Confirm publication'}</button></Dialog>}</div>
 }
-
-export const SchedulingView: React.FC<SchedulingViewProps> = ({
-  contentPackage
-}) => {
-  const [platform, setPlatform] = useState<'INSTAGRAM_FEED' | 'INSTAGRAM_REELS' | 'INSTAGRAM_STORIES' | 'FACEBOOK'>('INSTAGRAM_FEED');
-  const [scheduledDate, setScheduledDate] = useState<string>('2026-10-20T10:00');
-  const [customCaption, setCustomCaption] = useState<string>(contentPackage.caption.text);
-  const [isPublishing, setIsPublishing] = useState<boolean>(false);
-  const [publishedStatus, setPublishedStatus] = useState<any>(null);
-
-  const isPackageApproved = contentPackage.status === 'APPROVED';
-
-  const handleSimulatePublish = () => {
-    setIsPublishing(true);
-    setTimeout(() => {
-      setPublishedStatus({
-        status: 'PUBLISHED',
-        metaPostId: 'meta_ig_17984291847102941',
-        publishedAt: new Date().toISOString(),
-        platform: platform,
-        containerId: '180293810293819'
-      });
-      setIsPublishing(false);
-    }, 1200);
-  };
-
-  const metaGraphPayload = {
-    platform: platform,
-    scheduled_publish_time: new Date(scheduledDate).toISOString(),
-    media_type: platform === 'INSTAGRAM_REELS' ? 'REELS' : platform === 'INSTAGRAM_FEED' ? 'CAROUSEL' : 'IMAGE',
-    caption: `${customCaption}\n\n${contentPackage.caption.hashtags.join(' ')}`,
-    children_items: platform === 'INSTAGRAM_FEED' ? [
-      { image_url: `https://api.steerclub.com/v1/packages/${contentPackage.id}/render/carousel/slides/0` },
-      { image_url: `https://api.steerclub.com/v1/packages/${contentPackage.id}/render/carousel/slides/1` },
-      { image_url: `https://api.steerclub.com/v1/packages/${contentPackage.id}/render/carousel/slides/2` },
-      { image_url: `https://api.steerclub.com/v1/packages/${contentPackage.id}/render/carousel/slides/3` },
-      { image_url: `https://api.steerclub.com/v1/packages/${contentPackage.id}/render/carousel/slides/4` }
-    ] : undefined,
-    video_url: platform === 'INSTAGRAM_REELS' ? `https://api.steerclub.com/v1/packages/${contentPackage.id}/render/reel/video` : undefined,
-    image_url: platform !== 'INSTAGRAM_REELS' && platform !== 'INSTAGRAM_FEED' ? `https://api.steerclub.com/v1/packages/${contentPackage.id}/render/static?format=portrait` : undefined,
-    access_token: 'EAAX...[SECURE_META_GRAPH_TOKEN]'
-  };
-
-  return (
-    <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-[#F8F2EB] border border-[#E6CBBD] rounded-xl p-5 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider font-bold text-[#661414] bg-[#E6CBBD]/60 px-2 py-0.5 rounded">
-                Distribution Connector
-              </span>
-              <span className="text-xs text-[#B58777]">• Meta Graph API / Instagram Content Publishing</span>
-            </div>
-            <h2 className="text-xl font-serif text-[#661414] font-bold mt-1">
-              Social Media Scheduling & Meta Connector
-            </h2>
-            <p className="text-xs text-[#351D1D] mt-0.5">
-              Automate multi-channel scheduling for Instagram Feed Carousels, Video Reels, and Stories once clinically approved.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isPackageApproved ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-300">
-                <span>✓</span>
-                <span>Clinically Approved for Publishing</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full border border-amber-300">
-                <span>🔒</span>
-                <span>Locked (Doctor Approval Required)</span>
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Left: Schedule Configuration */}
-        <div className="bg-[#F8F2EB] border border-[#E6CBBD] rounded-xl p-5 shadow-xs space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#661414]">
-            Campaign Settings & Platforms
-          </h3>
-
-          <div>
-            <label className="text-xs font-semibold text-[#351D1D] block mb-1">Target Channel:</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'INSTAGRAM_FEED', label: '📸 Instagram Carousel Feed' },
-                { id: 'INSTAGRAM_REELS', label: '🎬 Instagram Reels Video' },
-                { id: 'INSTAGRAM_STORIES', label: '📱 Instagram Story (9:16)' },
-                { id: 'FACEBOOK', label: '👥 Facebook Brand Page' }
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setPlatform(item.id as any)}
-                  className={`p-2.5 rounded-lg border text-xs font-medium text-left transition-colors ${
-                    platform === item.id
-                      ? 'bg-[#661414] text-white border-[#661414] shadow-xs'
-                      : 'bg-[#F5EBDF] border-[#E6CBBD] text-[#351D1D] hover:bg-[#E6CBBD]'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#351D1D] block mb-1">Publishing Date & Time:</label>
-            <input
-              type="datetime-local"
-              value={scheduledDate}
-              onChange={(e) => setScheduledDate(e.target.value)}
-              className="w-full text-xs bg-[#F5EBDF] border border-[#E6CBBD] rounded-md px-3 py-2 text-[#351D1D] focus:outline-none focus:ring-1 focus:ring-[#C04E2A]"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#351D1D] block mb-1">Custom Caption:</label>
-            <textarea
-              rows={4}
-              value={customCaption}
-              onChange={(e) => setCustomCaption(e.target.value)}
-              className="w-full text-xs bg-[#F5EBDF] border border-[#E6CBBD] rounded-md p-2.5 text-[#351D1D] focus:outline-none focus:ring-1 focus:ring-[#C04E2A]"
-            />
-          </div>
-
-          <div className="pt-2">
-            <button
-              onClick={handleSimulatePublish}
-              disabled={isPublishing || !isPackageApproved}
-              className="w-full py-2.5 px-4 bg-[#C04E2A] hover:bg-[#a63d1e] text-white text-xs font-bold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isPublishing ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
-                  Sending to Meta Graph API...
-                </span>
-              ) : (
-                '🚀 Schedule / Publish Post Now'
-              )}
-            </button>
-            {!isPackageApproved && (
-              <p className="text-[11px] text-[#C04E2A] mt-1 text-center font-medium">
-                * Note: Under medical review rules, publishing requires doctor sign-off.
-              </p>
-            )}
-          </div>
-
-          {publishedStatus && (
-            <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-900 text-xs space-y-1">
-              <div className="flex items-center gap-1.5 font-bold">
-                <span>✓ Successfully Sent to Meta!</span>
-              </div>
-              <div>Meta Container ID: <code className="bg-emerald-100 px-1 py-0.5 rounded">{publishedStatus.containerId}</code></div>
-              <div>Live Post ID: <code className="bg-emerald-100 px-1 py-0.5 rounded">{publishedStatus.metaPostId}</code></div>
-              <div className="text-[11px] text-emerald-700">Timestamp: {new Date(publishedStatus.publishedAt).toLocaleString()}</div>
-            </div>
-          )}
-        </div>
-
-        {/* Right: Meta Graph API Payload Inspector */}
-        <div className="bg-[#F8F2EB] border border-[#E6CBBD] rounded-xl p-5 shadow-xs space-y-3 flex flex-col">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#661414]">
-              Meta Graph API Payload Preview
-            </h3>
-            <span className="text-[10px] text-[#B58777] font-mono">POST /v19.0/{'{ig_user_id}'}/media</span>
-          </div>
-
-          <p className="text-xs text-[#795B50]">
-            The pipeline converts the doctor-approved clinical package into standard JSON parameters expected by Instagram Graph API containers.
-          </p>
-
-          <pre className="flex-1 bg-[#351D1D] text-[#F5EBDF] p-3.5 rounded-lg font-mono text-[11px] overflow-x-auto leading-relaxed">
-            {JSON.stringify(metaGraphPayload, null, 2)}
-          </pre>
-
-          <div className="p-3 bg-[#F5EBDF] rounded-lg border border-[#E6CBBD] text-[11px] text-[#351D1D] space-y-1">
-            <strong>Supported Meta Formats:</strong>
-            <ul className="list-disc list-inside space-y-0.5 text-[#795B50]">
-              <li>CAROUSEL: 5-7 slides sequence (1080x1350 / 1080x1080)</li>
-              <li>REELS: 9:16 vertical video with synchronized audio and subtitles</li>
-              <li>STATIC: Single editorial graphic in multiple dimensions</li>
-            </ul>
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-  );
-};
