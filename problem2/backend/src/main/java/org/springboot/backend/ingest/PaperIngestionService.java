@@ -3,6 +3,7 @@ package org.springboot.backend.ingest;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.jsoup.Jsoup;
+import org.jsoup.parser.Parser;
 import org.springboot.backend.common.ApiException;
 import org.springboot.backend.domain.Paper;
 import org.springboot.backend.domain.DomainTypes.PaperSourceType;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.time.*;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Service
 public class PaperIngestionService {
@@ -63,23 +65,21 @@ public class PaperIngestionService {
                 }
             }
 
-            HttpResponse<byte[]> response=null;
-            for(int redirect=0;redirect<4;redirect++){
-                response=http.send(HttpRequest.newBuilder(fetchUri)
-                        .timeout(Duration.ofSeconds(25))
-                        .header("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                        .header("Accept","text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8")
-                        .header("Accept-Language","en-US,en;q=0.9")
-                        .GET().build(),HttpResponse.BodyHandlers.ofByteArray());
-                if(response.body().length>MAX_BYTES) throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE,"Remote paper must be 20 MB or smaller");
-                if(response.statusCode()/100==3){String location=response.headers().firstValue("location").orElseThrow(()->ApiException.badRequest("Redirect has no destination"));fetchUri=validatePublicHttps(fetchUri.resolve(location));continue;}
-                break;
+            HttpResponse<byte[]> response=fetch(fetchUri);
+            if(response.statusCode()==403&&!isPubMed){
+                String doi=extractDoi(uri);
+                String pmid=doi==null?null:findPubMedId(doi);
+                if(pmid!=null){
+                    fetchUri=pubMedAbstractUri(pmid);
+                    response=fetch(fetchUri);
+                    isPubMed=true;
+                }
             }
-            if(response==null||response.statusCode()/100!=2){
-                if(response!=null&&response.statusCode()==403){
+            if(response.statusCode()/100!=2){
+                if(response.statusCode()==403){
                     throw ApiException.badRequest("Publisher ("+uri.getHost()+") blocked automated fetch (HTTP 403 bot challenge). Please upload the PDF directly.");
                 }
-                throw ApiException.badRequest("Paper URL returned HTTP "+(response!=null?response.statusCode():"error"));
+                throw ApiException.badRequest("Paper URL returned HTTP "+response.statusCode());
             }
             String type=response.headers().firstValue("content-type").orElse("").toLowerCase(Locale.ROOT);
             List<String> pages; String discovered=null;
@@ -98,9 +98,45 @@ public class PaperIngestionService {
                 if(text.length()<400)throw ApiException.unprocessable("The linked page contains too little readable research text");
                 pages=List.of(text);discovered=document.title();
             }
-            String storedType=(type.contains("pdf")||startsPdf(response.body()))?"application/pdf":"text/html;charset=UTF-8";
+            String storedType=(type.contains("pdf")||startsPdf(response.body()))?"application/pdf":isPubMed?"text/plain;charset=UTF-8":"text/html;charset=UTF-8";
             return store(cleanTitle(suppliedTitle,null,discovered),PaperSourceType.URL,uri.toString(),null,storedType,response.body(),pages);
         }catch(ApiException e){throw e;}catch(InterruptedException e){Thread.currentThread().interrupt();throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"URL ingestion was interrupted");}catch(Exception e){throw ApiException.badRequest("Paper URL could not be ingested: "+e.getMessage());}
+    }
+
+    private HttpResponse<byte[]> fetch(URI start)throws IOException,InterruptedException{
+        URI current=start;HttpResponse<byte[]> response=null;
+        for(int redirect=0;redirect<4;redirect++){
+            response=http.send(HttpRequest.newBuilder(current)
+                    .timeout(Duration.ofSeconds(25))
+                    .header("User-Agent","MetaboQuest/1.0 research-ingestion")
+                    .header("Accept","text/html,application/xhtml+xml,application/xml,text/plain,application/pdf,*/*;q=0.8")
+                    .header("Accept-Language","en-US,en;q=0.9")
+                    .GET().build(),HttpResponse.BodyHandlers.ofByteArray());
+            if(response.body().length>MAX_BYTES)throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE,"Remote paper must be 20 MB or smaller");
+            if(response.statusCode()/100!=3)return response;
+            String location=response.headers().firstValue("location").orElseThrow(()->ApiException.badRequest("Redirect has no destination"));
+            current=validatePublicHttps(current.resolve(location));
+        }
+        return Objects.requireNonNull(response);
+    }
+
+    static String extractDoi(URI uri){
+        String path=uri.getPath();
+        var matcher=Pattern.compile("(?i)(10\\.\\d{4,9}/[-._;()/:A-Z0-9]+)").matcher(path);
+        return matcher.find()?matcher.group(1):null;
+    }
+
+    private String findPubMedId(String doi)throws IOException,InterruptedException{
+        String term=URLEncoder.encode(doi+"[AID]",StandardCharsets.UTF_8);
+        URI search=URI.create("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=xml&retmax=1&tool=metaboquest&term="+term);
+        HttpResponse<byte[]> response=fetch(search);
+        if(response.statusCode()/100!=2)return null;
+        var id=Jsoup.parse(new String(response.body(),StandardCharsets.UTF_8),"",Parser.xmlParser()).selectFirst("IdList > Id");
+        return id!=null&&id.text().matches("\\d+")?id.text():null;
+    }
+
+    private URI pubMedAbstractUri(String pmid){
+        return URI.create("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id="+pmid+"&retmode=text&rettype=abstract");
     }
 
 
