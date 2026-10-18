@@ -31,7 +31,14 @@ export async function request<T>(path: string, options: RequestInit = {}, auth: 
     window.dispatchEvent(new CustomEvent('studio-connectivity', { detail: true }))
     if (!response.ok) {
       let detail = ''
-      try { const body = await response.json(); if (typeof body.error === 'string') detail = body.error.slice(0, 500) } catch { /* Do not expose raw HTML or stack traces. */ }
+      try {
+        const body: unknown = await response.json()
+        if (body && typeof body === 'object') {
+          const problem = body as Record<string, unknown>
+          const explanation = typeof problem.message === 'string' ? problem.message : problem.error
+          if (typeof explanation === 'string') detail = explanation.slice(0, 500)
+        }
+      } catch { /* Do not expose raw HTML or stack traces. */ }
       throw new ApiError(detail || (response.status === 401 || response.status === 403 ? 'Access denied. Check the configured API key for this action.' : `The service returned ${response.status}. Please retry or check the backend configuration.`), response.status)
     }
     if (response.status === 204) return undefined as T
