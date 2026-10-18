@@ -1,122 +1,25 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom'
+import Landing from './pages/Landing'
+import { Dialog, EmptyState, Loading } from './components/ui'
+import { config } from './services/config'
+import { storage } from './services/storage'
 import './App.css'
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+const Play = lazy(() => import('./pages/Play'))
+const Results = lazy(() => import('./pages/Results'))
+const Challenge = lazy(() => import('./pages/Challenge'))
+const Explore = lazy(() => import('./pages/Explore'))
+function Shell() {
+  const location = useLocation()
+  const [privacy, setPrivacy] = useState(false)
+  const [consent, setConsent] = useState(() => storage.get('analytics-consent') === true)
+  useEffect(() => { window.scrollTo(0, 0); document.getElementById('main')?.focus(); document.title = `${location.pathname === '/' ? 'A little curiosity. A healthier conversation.' : 'Play, learn, discover'} — MetaboQuest by Steer` }, [location.pathname])
+  const playing = location.pathname === '/play'
+  return <><a className="skip-link" href="#main">Skip to content</a><div className="site-wrap"><header className="header">{playing ? <span className="wordmark" aria-label="Steer">steer<span>↗</span></span> : <Link className="wordmark" to="/" aria-label="Steer home">steer<span>↗</span></Link>}<span className="header-caption">A little curiosity. <br />A healthier conversation.</span><nav aria-label="Main navigation">{playing ? <span className="nav-label">THE KNOWLEDGE QUIZ</span> : <><Link className={location.pathname === '/explore' ? 'active' : ''} to="/explore">About Steer <span aria-hidden="true">↗</span></Link><Link className="nav-play" to="/play">Take the quiz <span aria-hidden="true">→</span></Link></>}</nav></header>
+    {config.mode === 'standalone' && <div className="mode-banner">Standalone edition · Local results are unverified</div>}
+    <main id="main" tabIndex={-1}><Suspense fallback={<Loading />}><Routes><Route path="/" element={<Landing />} /><Route path="/play" element={<Play />} /><Route path="/results/:attemptId" element={<Results />} /><Route path="/challenge/:challengeCode" element={<Challenge />} /><Route path="/explore" element={<Explore />} /><Route path="*" element={<EmptyState title="A little off the beaten path.">This page isn’t here, but your next discovery is just three questions away.</EmptyState>} /></Routes></Suspense></main>
+    <footer className="footer"><div><Link className="footer-brand" to={playing ? '/play' : '/'}>MetaboQuest<span> by Steer</span></Link><p>A knowledge quiz. Not a health assessment.</p></div><div className="footer-end"><span>MADE FOR CURIOUS MINDS</span><button className="text-button" onClick={() => setPrivacy(true)}>Privacy & analytics</button></div></footer></div>
+    {privacy && <Dialog title="Your curiosity. Your choice." close={() => setPrivacy(false)}><p>No account, medical history, or contact details are needed to play.</p><p>Quiz progress and private result access are saved in this browser tab’s session storage. Result access is lost when the tab’s session ends. Public challenge links share your quiz score and achievement.</p><label className="consent-option"><input type="checkbox" checked={consent} onChange={e => { setConsent(e.target.checked); storage.set('analytics-consent', e.target.checked) }} /><span>Allow optional gameplay analytics<small>Send gameplay events, timings, and sharing channels to help improve the quiz. No health information. You can turn this off anytime.</small></span></label><p className="small">Optional analytics are off by default. {config.mode === 'standalone' && 'Standalone mode sends no analytics.'}</p><button className="button" onClick={() => setPrivacy(false)}>Done <span aria-hidden="true">✓</span></button></Dialog>}
+  </>
 }
-
-export default App
+export default function App() { return <BrowserRouter><Shell /></BrowserRouter> }
