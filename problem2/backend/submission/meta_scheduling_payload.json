@@ -1,0 +1,19 @@
+{
+  "platform" : "INSTAGRAM_FEED",
+  "scheduled_for" : "2026-10-20T10:00:00Z",
+  "caption" : "Weight regain after stopping medication is biological, not a personal failure. Long-term habits and clinician guidance prevent the rebound effect.\n\nLearn how Steer doctors assess metabolic care: steerclub.com\n\n#MetabolicHealth #SteerClub #GLP1Facts #EvidenceFirst",
+  "media_type" : "CAROUSEL",
+  "children" : [ {
+    "image_url" : "https://api.steerclub.com/v1/packages/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/render/carousel/slides/0"
+  }, {
+    "image_url" : "https://api.steerclub.com/v1/packages/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/render/carousel/slides/1"
+  }, {
+    "image_url" : "https://api.steerclub.com/v1/packages/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/render/carousel/slides/2"
+  }, {
+    "image_url" : "https://api.steerclub.com/v1/packages/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/render/carousel/slides/3"
+  }, {
+    "image_url" : "https://api.steerclub.com/v1/packages/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/render/carousel/slides/4"
+  } ],
+  "simulated_meta_post_id" : "meta_ig_17984291847102941",
+  "status" : "SCHEDULED"
+}

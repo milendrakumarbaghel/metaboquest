@@ -1,0 +1,4 @@
+Steer Science Studio (Problem Statement 2):
+Local Dev: http://localhost:5173
+Production Preview (Vercel): https://steer-science-studio.vercel.app [Or deploy problem2/frontend to Vercel/Railway]
+API Backend: http://localhost:8080/api/v1

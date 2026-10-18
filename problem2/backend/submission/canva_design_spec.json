@@ -1,0 +1,38 @@
+{
+  "app" : "Steer Science Studio Canva Automator",
+  "version" : "1.0",
+  "brandColors" : {
+    "deepMaroon" : "#661414",
+    "cream" : "#F5EBDF",
+    "softPaper" : "#F8F2EB",
+    "clay" : "#B58777",
+    "steerRust" : "#C04E2A",
+    "ink" : "#351D1D",
+    "blush" : "#E6CBBD"
+  },
+  "typography" : {
+    "accent" : "Editorial Serif Italic",
+    "headline" : "Playfair Display / Serif Bold",
+    "body" : "Plus Jakarta Sans / Inter"
+  },
+  "packageId" : "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "paperTitle" : "Weight regain and cardiometabolic effects after withdrawal of semaglutide: The STEP 1 trial extension",
+  "language" : "en",
+  "templates" : [ {
+    "format" : "CAROUSEL",
+    "importMethod" : "Upload exported SVGs or PNG deck directly into Canva as a multi-page presentation",
+    "slidesCount" : 6,
+    "canvaTemplateUrl" : "https://www.canva.com/design/templates?query=editorial+carousel",
+    "dimensions" : "1080x1080 (Square 1:1) and 1080x1350 (Portrait 4:5)"
+  }, {
+    "canvaTemplateUrl" : "https://www.canva.com/design/templates?query=minimalist+health+quote",
+    "format" : "STATIC_POST",
+    "importMethod" : "Import vector SVG or PNG frame into Canva post layout",
+    "dimensions" : "1080x1080, 1080x1350, 1080x1920"
+  }, {
+    "canvaTemplateUrl" : "https://www.canva.com/design/templates?query=instagram+reels+minimal",
+    "format" : "AI_REEL",
+    "importMethod" : "Drag rendered scenes and drop synchronized voiceover audio track into Canva Video Editor",
+    "dimensions" : "1080x1920 (9:16 Vertical Video)"
+  } ]
+}
