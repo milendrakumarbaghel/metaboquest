@@ -1,0 +1,43 @@
+services:
+  # Problem 2 Backend (Steer Science Studio)
+  - type: web
+    name: steer-science-studio-backend
+    runtime: docker
+    rootDir: problem2/backend
+    dockerfilePath: Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: PIPELINE_API_KEY
+        value: demo-pipeline-key
+      - key: REVIEW_API_KEY
+        value: demo-review-key
+
+  # Problem 1 Backend (MetaboQuest Playable Ad & Quiz)
+  - type: web
+    name: metaboquest-problem1-backend
+    runtime: docker
+    rootDir: problem1/backend
+    dockerfilePath: Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
