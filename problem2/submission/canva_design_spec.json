@@ -2,13 +2,13 @@
   "app" : "Steer Science Studio Canva Automator",
   "version" : "1.0",
   "brandColors" : {
-    "blush" : "#E6CBBD",
     "deepMaroon" : "#661414",
     "cream" : "#F5EBDF",
     "softPaper" : "#F8F2EB",
     "clay" : "#B58777",
     "steerRust" : "#C04E2A",
-    "ink" : "#351D1D"
+    "ink" : "#351D1D",
+    "blush" : "#E6CBBD"
   },
   "typography" : {
     "accent" : "Editorial Serif Italic",
@@ -19,11 +19,11 @@
   "paperTitle" : "Weight regain and cardiometabolic effects after withdrawal of semaglutide: The STEP 1 trial extension",
   "language" : "en",
   "templates" : [ {
-    "dimensions" : "1080x1080 (Square 1:1) and 1080x1350 (Portrait 4:5)",
     "format" : "CAROUSEL",
     "importMethod" : "Upload exported SVGs or PNG deck directly into Canva as a multi-page presentation",
     "slidesCount" : 6,
-    "canvaTemplateUrl" : "https://www.canva.com/design/templates?query=editorial+carousel"
+    "canvaTemplateUrl" : "https://www.canva.com/design/templates?query=editorial+carousel",
+    "dimensions" : "1080x1080 (Square 1:1) and 1080x1350 (Portrait 4:5)"
   }, {
     "canvaTemplateUrl" : "https://www.canva.com/design/templates?query=minimalist+health+quote",
     "format" : "STATIC_POST",

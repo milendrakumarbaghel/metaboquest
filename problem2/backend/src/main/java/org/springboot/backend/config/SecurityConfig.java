@@ -22,7 +22,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/packages/*/render/**", "/api/v1/packages/*/export/**").permitAll()
                         .requestMatchers("/api/v1/review/**").hasRole("REVIEWER")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/packages/**", "/api/v1/papers/**", "/api/v1/batches/**").hasAnyRole("PIPELINE", "REVIEWER")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/packages", "/api/v1/packages/**", "/api/v1/papers", "/api/v1/papers/**", "/api/v1/batches", "/api/v1/batches/**").hasAnyRole("PIPELINE", "REVIEWER")
                         .requestMatchers("/api/v1/**").hasRole("PIPELINE")
                         .anyRequest().denyAll())
                 .addFilterBefore(keys, UsernamePasswordAuthenticationFilter.class)

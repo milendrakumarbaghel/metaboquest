@@ -10,6 +10,7 @@ export interface AppState {
 }
 export type Action =
   | { type: 'paper'; paper: PaperView; select?: boolean }
+  | { type: 'papers'; papers: PaperView[]; selectId?: string }
   | { type: 'select'; paperId: string }
   | { type: 'package'; pkg: PackageView; activate?: boolean }
   | { type: 'tab'; tab: Tab }
@@ -24,6 +25,7 @@ export const initialState: AppState = { papers: [], activePaperId: null, package
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'paper': { const papers = [...state.papers.filter(p => p.id !== action.paper.id), action.paper]; return { ...state, papers, ...(action.select ? { activePaperId: action.paper.id, activePackageId: state.packageIdByPaperAndLang[action.paper.id]?.[state.activeLanguage] ?? null } : {}) } }
+    case 'papers': { const selectedId = action.selectId !== undefined ? action.selectId : (action.papers.length > 0 ? action.papers[0].id : state.activePaperId); return { ...state, papers: action.papers, activePaperId: selectedId, activePackageId: selectedId ? (state.packageIdByPaperAndLang[selectedId]?.[state.activeLanguage] ?? null) : null } }
     case 'select': return { ...state, activePaperId: action.paperId, activePackageId: state.packageIdByPaperAndLang[action.paperId]?.[state.activeLanguage] ?? null }
     case 'package': { const p = action.pkg; return { ...state, packages: { ...state.packages, [p.id]: p }, packageIdByPaperAndLang: { ...state.packageIdByPaperAndLang, [p.paper.id]: { ...state.packageIdByPaperAndLang[p.paper.id], [p.language]: p.id } }, ...(action.activate ? { activePackageId: p.language === state.activeLanguage ? p.id : null, activePaperId: p.paper.id } : {}) } }
     case 'tab': return { ...state, activeTab: action.tab }

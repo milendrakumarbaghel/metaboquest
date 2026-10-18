@@ -35,7 +35,13 @@ export async function demoRequest<T>(path: string, options: RequestInit): Promis
   } else if (segments[3] === 'papers' && segments[5] === 'generate') {
     const paper = papers.get(segments[4]); if (!paper) throw new Error('Sample paper not found.')
     const input = body as GenerateInput; const pkg = makePackage(paper, input.language, input.audience); packages.set(pkg.id, pkg); response = pkg
-  } else if (segments[3] === 'papers') response = papers.get(segments[4])
+  } else if (segments[3] === 'papers' && segments.length === 4) {
+    response = Array.from(papers.values())
+  } else if (segments[3] === 'papers') {
+    response = papers.get(segments[4])
+  } else if (segments[3] === 'packages' && segments.length === 4) {
+    response = Array.from(packages.values())
+  }
   else if (path === '/api/v1/batches' && method === 'POST') {
     const ids = (body.paperIds as string[]).map(id => { const pkg = makePackage(papers.get(id)!, body.language, body.audience); packages.set(pkg.id, pkg); return pkg.id })
     const batch: BatchView = { id: crypto.randomUUID(), status: 'COMPLETED', requestedCount: ids.length, completedCount: ids.length, failedCount: 0, packageIds: ids, errors: {}, createdAt: now(), completedAt: now() }; batches.set(batch.id, batch); response = batch

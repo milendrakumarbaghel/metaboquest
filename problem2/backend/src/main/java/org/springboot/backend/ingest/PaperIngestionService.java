@@ -41,23 +41,68 @@ public class PaperIngestionService {
     @Transactional
     public Paper ingestUrl(String value,String suppliedTitle){
         try{
-            URI uri=validatePublicHttps(URI.create(value));
+            URI rawUri=URI.create(value.trim());
+            URI uri=validatePublicHttps(rawUri);
+            String host=uri.getHost().toLowerCase(Locale.ROOT);
+            String path=uri.getPath();
+            URI fetchUri=uri;
+            boolean isPubMed=false;
+
+            if(host.contains("pubmed.ncbi.nlm.nih.gov")){
+                var matcher=java.util.regex.Pattern.compile("/(\\d+)").matcher(path);
+                if(matcher.find()){
+                    String pmid=matcher.group(1);
+                    fetchUri=URI.create("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id="+pmid+"&retmode=text&rettype=abstract");
+                    isPubMed=true;
+                }
+            }else if(host.contains("ncbi.nlm.nih.gov")&&path.matches(".*PMC\\d+.*")){
+                var matcher=java.util.regex.Pattern.compile("PMC(\\d+)").matcher(path);
+                if(matcher.find()){
+                    String pmcid=matcher.group(1);
+                    fetchUri=URI.create("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id="+pmcid+"&retmode=text");
+                }
+            }
+
             HttpResponse<byte[]> response=null;
             for(int redirect=0;redirect<4;redirect++){
-                response=http.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(25)).header("User-Agent","SteerResearchPipeline/1.0").GET().build(),HttpResponse.BodyHandlers.ofByteArray());
+                response=http.send(HttpRequest.newBuilder(fetchUri)
+                        .timeout(Duration.ofSeconds(25))
+                        .header("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                        .header("Accept","text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8")
+                        .header("Accept-Language","en-US,en;q=0.9")
+                        .GET().build(),HttpResponse.BodyHandlers.ofByteArray());
                 if(response.body().length>MAX_BYTES) throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE,"Remote paper must be 20 MB or smaller");
-                if(response.statusCode()/100==3){String location=response.headers().firstValue("location").orElseThrow(()->ApiException.badRequest("Redirect has no destination"));uri=validatePublicHttps(uri.resolve(location));continue;}
+                if(response.statusCode()/100==3){String location=response.headers().firstValue("location").orElseThrow(()->ApiException.badRequest("Redirect has no destination"));fetchUri=validatePublicHttps(fetchUri.resolve(location));continue;}
                 break;
             }
-            if(response==null||response.statusCode()/100!=2) throw ApiException.badRequest("Paper URL returned a non-success response");
+            if(response==null||response.statusCode()/100!=2){
+                if(response!=null&&response.statusCode()==403){
+                    throw ApiException.badRequest("Publisher ("+uri.getHost()+") blocked automated fetch (HTTP 403 bot challenge). Please upload the PDF directly.");
+                }
+                throw ApiException.badRequest("Paper URL returned HTTP "+(response!=null?response.statusCode():"error"));
+            }
             String type=response.headers().firstValue("content-type").orElse("").toLowerCase(Locale.ROOT);
-            List<String> pages; String discovered;
-            if(type.contains("pdf")||startsPdf(response.body())){Extracted extracted=extractPdf(response.body());pages=extracted.pages();discovered=extracted.title();}
-            else {var document=Jsoup.parse(new String(response.body(),StandardCharsets.UTF_8),uri.toString());document.select("script,style,nav,footer,header,form").remove();String text=document.body().text().replaceAll("\\s+"," ").trim();if(text.length()<400)throw ApiException.unprocessable("The linked page contains too little readable research text");pages=List.of(text);discovered=document.title();}
+            List<String> pages; String discovered=null;
+            if(isPubMed){
+                String fullText=new String(response.body(),StandardCharsets.UTF_8).trim();
+                if(fullText.length()<200) throw ApiException.unprocessable("Could not retrieve readable abstract from PubMed");
+                String[] paragraphs=fullText.split("\\n\\s*\\n");
+                if(paragraphs.length>=2) discovered=paragraphs[1].replaceAll("\\s+"," ").trim();
+                pages=List.of(fullText);
+            }else if(type.contains("pdf")||startsPdf(response.body())){
+                Extracted extracted=extractPdf(response.body());pages=extracted.pages();discovered=extracted.title();
+            }else{
+                var document=Jsoup.parse(new String(response.body(),StandardCharsets.UTF_8),fetchUri.toString());
+                document.select("script,style,nav,footer,header,form").remove();
+                String text=document.body().text().replaceAll("\\s+"," ").trim();
+                if(text.length()<400)throw ApiException.unprocessable("The linked page contains too little readable research text");
+                pages=List.of(text);discovered=document.title();
+            }
             String storedType=(type.contains("pdf")||startsPdf(response.body()))?"application/pdf":"text/html;charset=UTF-8";
             return store(cleanTitle(suppliedTitle,null,discovered),PaperSourceType.URL,uri.toString(),null,storedType,response.body(),pages);
         }catch(ApiException e){throw e;}catch(InterruptedException e){Thread.currentThread().interrupt();throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"URL ingestion was interrupted");}catch(Exception e){throw ApiException.badRequest("Paper URL could not be ingested: "+e.getMessage());}
     }
+
 
     private Paper store(String title,PaperSourceType type,String url,String fileName,String contentType,byte[] source,List<String> pages){
         String hash=sha256(source);Optional<Paper> existing=papers.findBySha256(hash);if(existing.isPresent())return existing.get();

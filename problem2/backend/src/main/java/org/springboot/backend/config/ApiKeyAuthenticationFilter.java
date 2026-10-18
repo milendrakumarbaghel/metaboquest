@@ -16,7 +16,10 @@ import java.util.*;
 @Component
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     private final String ingestKey, reviewKey;
-    public ApiKeyAuthenticationFilter(Environment env){ingestKey=env.getProperty("PIPELINE_API_KEY","");reviewKey=env.getProperty("REVIEW_API_KEY","");}
+    public ApiKeyAuthenticationFilter(Environment env){
+        ingestKey = env.getProperty("PIPELINE_API_KEY", "demo-pipeline-key");
+        reviewKey = env.getProperty("REVIEW_API_KEY", "demo-review-key");
+    }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
         String supplied=request.getHeader("X-API-Key");
         if(supplied!=null){

@@ -44,6 +44,8 @@ public class PipelineService {
         paper.generated(now);return pack;
     }
     @Transactional(readOnly=true) public ContentPackage get(UUID id){return packages.findDetailed(id).orElseThrow(()->ApiException.notFound("Content package not found"));}
+    @Transactional(readOnly=true) public List<ContentPackage> findByPaper(UUID paperId){return packages.findByPaperIdDetailed(paperId);}
+    @Transactional(readOnly=true) public List<ContentPackage> listAllPackages(){return packages.findAllDetailed();}
     @Transactional(readOnly=true) public List<Claim> claims(UUID id){get(id);return claims.findByContentPackageIdOrderByPageNumberAsc(id);}
     @Transactional(readOnly=true) public List<ContentAsset> assets(UUID id){get(id);return assets.findByContentPackageIdOrderByAssetTypeAsc(id);}
     private void validateShape(AiGateway.GeneratedContent g){if(g==null||g.claims()==null||g.claims().isEmpty()||g.claims().size()>5||g.assets()==null)throw ApiException.unprocessable("AI output did not match the required content structure");}
