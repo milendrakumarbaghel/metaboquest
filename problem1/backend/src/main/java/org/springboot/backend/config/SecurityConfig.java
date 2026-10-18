@@ -35,16 +35,14 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource(MetaboQuestProperties properties, Environment environment) {
         List<String> origins = Arrays.stream(properties.allowedOrigins().split(",")).map(String::trim).filter(s -> !s.isBlank()).toList();
-        if (Arrays.asList(environment.getActiveProfiles()).contains("prod") && origins.contains("*"))
-            throw new IllegalStateException("Wildcard CORS is not permitted in production");
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(origins);
-        config.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Content-Type", "Accept"));
+        config.setAllowedOriginPatterns(origins);
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", config);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 }

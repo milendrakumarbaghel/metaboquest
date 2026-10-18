@@ -1,5 +1,5 @@
 export const demo = new URLSearchParams(window.location.search).get('demo') === 'true'
-const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+const base = (import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? 'https://metaboquest-problem2-backend.onrender.com' : '')).replace(/\/$/, '')
 const keys = { pipeline: import.meta.env.VITE_PIPELINE_API_KEY || 'demo-pipeline-key', review: import.meta.env.VITE_REVIEW_API_KEY || 'demo-review-key' }
 export class ApiError extends Error {
   status: number
