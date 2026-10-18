@@ -1,4 +1,4 @@
-import type { Session, Questions, Submission, Result, Challenge, PublicChallenge } from '../types'
+import type { LearningTopic, Session, Questions, Submission, Result, Challenge, PublicChallenge } from '../types'
 import { config } from './config'
 export class ApiError extends Error {
   status: number
@@ -40,7 +40,7 @@ export async function request<T>(path: string, options: { body?: unknown; method
   }
 }
 export const api = {
-  start: () => request<Session>('/api/v1/quiz/sessions', { method: 'POST' }),
+  start: (topic: LearningTopic = 'GENERAL') => request<Session>('/api/v1/quiz/sessions', { method: 'POST', body: { topic } }),
   questions: (id: string, signal?: AbortSignal) => request<Questions>(`/api/v1/quiz/questions?sessionId=${encodeURIComponent(id)}`, { signal }),
   submit: (body: Submission) => request<Result>('/api/v1/quiz/submit', { method: 'POST', body }),
   result: (id: string, token: string, signal?: AbortSignal) => request<Result>(`/api/v1/quiz/results/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`, { signal }),

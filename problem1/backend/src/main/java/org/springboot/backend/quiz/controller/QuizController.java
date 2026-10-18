@@ -17,7 +17,9 @@ public class QuizController {
     public QuizController(QuizService service) { this.service=service; }
 
     @PostMapping("/sessions")
-    public ResponseEntity<StartSessionResponse> start() { return ResponseEntity.status(HttpStatus.CREATED).body(service.start()); }
+    public ResponseEntity<StartSessionResponse> start(@Valid @RequestBody(required = false) StartSessionRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.start(request == null ? null : request.topic()));
+    }
 
     @GetMapping("/questions")
     public QuestionsResponse questions(@RequestParam UUID sessionId) { return service.getQuestions(sessionId); }

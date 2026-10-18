@@ -7,7 +7,8 @@ import java.util.*;
 
 public final class QuizDtos {
     private QuizDtos() { }
-    public record StartSessionResponse(UUID sessionId, UUID questionSetId, int questionSetVersion, int totalQuestions, SessionStatus status) { }
+    public record StartSessionRequest(LearningTopic topic) { }
+    public record StartSessionResponse(UUID sessionId, UUID questionSetId, int questionSetVersion, int totalQuestions, SessionStatus status, LearningTopic topic) { }
     public record OptionResponse(UUID id, String text) { }
     public record QuestionResponse(UUID id, QuestionType type, QuestionCategory category, String questionText, List<OptionResponse> options) { }
     public record QuestionsResponse(int questionSetVersion, int totalQuestions, List<QuestionResponse> questions) { }

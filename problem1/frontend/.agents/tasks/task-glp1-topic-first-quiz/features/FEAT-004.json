@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-004",
+  "type": "docs",
+  "description": "Documentation, content review checklist and submission pack. Document VITE_STEER_URL and the no-data-to-Steer policy, create submission/CONTENT_REVIEW_CHECKLIST.md, rebuild the playable, copy it to submission/playable-ad.html and zip it, write one-liners.md, TODO-marked demo-link.txt / loom-link.txt, SUBMISSION.md (run/deploy, 2-minute Loom script with timed beats, AI/tool disclosure, honest 'still needs from you'), replace stale submission/README.md and LOOM_SCRIPT.md. Depends on FEAT-001..003 (playable must be built from the final code).",
+  "status": "completed",
+  "steps": [
+    "Read plan.md FEAT-004 and section 6; read the current submission/README.md and LOOM_SCRIPT.md (stale; reuse only still-valid points).",
+    "frontend/.env.example: keep VITE_STEER_URL=https://steerclub.com with an explanatory comment (verified 200 and Steer's site; no query string appended; no topic or personal data sent). Update frontend/README.md (replace Vite template boilerplate with a MetaboQuest section: flow, scripts, env vars, offline playable, privacy, topic-sharing requires consent plus a real handoff mechanism) and frontend/API_SETUP.md (VITE_STEER_URL, VITE_APP_MODE).",
+    "Create /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/submission/CONTENT_REVIEW_CHECKLIST.md: statement that automated tests do not establish medical accuracy, content is source-checked but not clinician-reviewed, clinician review required before public use; table of every active question (1-5, 8-19, 21-40) with topic, text, claim, source title + URL, EMPTY clinician sign-off column, notes; separate list of retired ids 6, 7, 20; rows for the 7 topic takeaways and the Steer-journey claims (source: Steer hackathon brief). Generate with a throwaway script and delete the script afterwards.",
+    "Run npm run test:playable (rebuilds dist-playable/index.html and verifies offline flows) in the frontend dir; then cp dist-playable/index.html ../submission/playable-ad.html and (cd dist-playable && zip -j ../../submission/playable-ad.zip index.html); check with unzip -l that only index.html is inside; note both sizes.",
+    "Create one-liners.md (trigger / value / next step, one line each), demo-link.txt and loom-link.txt (first line 'TODO: ...' with instructions, no invented URLs), SUBMISSION.md (contents, how to run, Vercel deploy using the existing vercel.json, ~2-minute Loom script with timed beats, AI/tool disclosure, honest 'still needs from you' list: clinician review, Loom, live URL, Google Form, confirm Steer details, optional Meta packaging not done, no user testing). Overwrite submission/README.md with a short index; delete submission/LOOM_SCRIPT.md after merging its valid content.",
+    "Final full verification (below), banned-string scan over frontend/src, banks, submission/*.md (allowed only inside CONTENT_REVIEW_CHECKLIST.md URLs/internal notes), make sure no dev servers or temp scripts remain, and do NOT git commit."
+  ],
+  "acceptance_criteria": [
+    "submission/ contains playable-ad.html, playable-ad.zip (only index.html), one-liners.md, demo-link.txt (TODO), loom-link.txt (TODO), SUBMISSION.md, CONTENT_REVIEW_CHECKLIST.md and a short README.md; no fabricated URLs",
+    "playable-ad.html is byte-identical to the freshly built dist-playable/index.html and passes npm run test:playable (zero network requests, all 7 topic flows)",
+    "CONTENT_REVIEW_CHECKLIST.md lists every active question with source URL and an empty sign-off column and states clinician review is required",
+    "README/.env.example document VITE_STEER_URL and that no topic or personal data goes to Steer",
+    "Full suite green: ./mvnw test; tsc -b, lint, vitest run, build, test:e2e, test:playable"
+  ],
+  "verification": [
+    "cd /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/backend && ./mvnw test",
+    "cd /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/frontend && npx tsc -b && npm run lint && npx vitest run && npm run build && npm run test:e2e && npm run test:playable",
+    "cmp /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/frontend/dist-playable/index.html /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/submission/playable-ad.html && unzip -l /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/submission/playable-ad.zip",
+    "ls -la /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/submission"
+  ],
+  "blocked_reason": null,
+  "findings": "DONE (uncommitted). Verification: backend ./mvnw test 25 tests, 0 failures, BUILD SUCCESS; frontend tsc -b OK, lint clean, vitest 36 passed, build OK, test:e2e 4/4 passed, test:playable PASS all 7 offline topic flows with zero network requests. submission/playable-ad.html = 385526 bytes, byte-identical (cmp) to dist-playable/index.html; playable-ad.zip = 118005 bytes, contains only index.html. Created submission/: CONTENT_REVIEW_CHECKLIST.md (37 active questions, empty sign-off, 3 retired ids, 7 takeaways, Steer claims), one-liners.md, SUBMISSION.md (run, Vercel, timed Loom script, AI disclosure, still-needs list), demo-link.txt and loom-link.txt (TODO placeholders, no URLs), README.md replaced; LOOM_SCRIPT.md removed. Docs: .env.example, frontend/README.md, API_SETUP.md. One existing-test repair: MetaboQuestIntegrationTest.submission() helper now answers each question once (3-option V9 questions produced two wrong answers for one question -> 422, flaky); no new tests. Banned-string scan: frontend/src and submission md/txt clean (only 'not clinician-reviewed' statements); V9 bank clean; frozen V8 bank still has legacy source title 'Semaglutide', which V9 retitles at runtime and in the frontend. Nothing is claimed clinician-reviewed. Pre-existing IntelliJ backend and vite dev processes (started before this run) were left alone."
+}

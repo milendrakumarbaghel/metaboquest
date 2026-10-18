@@ -13,6 +13,7 @@ public class QuizQuestion {
     @Column(name = "question_text", nullable = false, columnDefinition = "text") private String questionText;
     @Enumerated(EnumType.STRING) @Column(name = "question_type", nullable = false) private QuestionType questionType;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private QuestionCategory category;
+    @Enumerated(EnumType.STRING) @Column(name = "learning_topic", nullable = false) private LearningTopic learningTopic;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private Difficulty difficulty;
     @Column(nullable = false, columnDefinition = "text") private String explanation;
     @Column(name = "display_order", nullable = false) private int displayOrder;
@@ -30,6 +31,7 @@ public class QuizQuestion {
     public String getQuestionText() { return questionText; }
     public QuestionType getQuestionType() { return questionType; }
     public QuestionCategory getCategory() { return category; }
+    public LearningTopic getLearningTopic() { return learningTopic; }
     public String getExplanation() { return explanation; }
     public int getDisplayOrder() { return displayOrder; }
     public List<QuestionOption> getOptions() { return options; }

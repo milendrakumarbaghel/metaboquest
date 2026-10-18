@@ -1,0 +1,6 @@
+import type { Feedback, LearningTopic } from '../types'
+import { contentReview, topics } from '../data/topics'
+export default function LearningTakeaways({ feedback, topic }: { feedback: Feedback[]; topic?: LearningTopic }) {
+  const focus = topics.find(item => item.value === topic)
+  return <section className="learning-takeaways" aria-labelledby="takeaways-title"><span className="eyebrow">THE VALUE, BEFORE THE SCORE</span><h2 id="takeaways-title">What to remember</h2>{focus && focus.value !== 'GENERAL' && <p>Your learning topic: {focus.label}</p>}<div>{[...feedback].sort((a, b) => Number(a.correct) - Number(b.correct)).map(item => <article key={item.questionId}><strong>{item.correct ? 'A fact to keep' : 'A myth cleared up'}</strong><p>{item.explanation}</p></article>)}</div><a className="inline-link" href="#answer-review" onClick={event => { event.preventDefault(); document.getElementById('answer-review')?.scrollIntoView({ behavior: 'auto' }) }}>Read the supporting sources ↓</a><p className="small">{contentReview.reviewedBy ? `Content reviewed by ${contentReview.reviewedBy}.` : 'Educational only, not medical advice. Answers cite public health sources and have not had a clinician sign-off.'} Your knowledge score is not a health assessment.</p></section>
+}

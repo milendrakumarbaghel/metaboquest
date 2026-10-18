@@ -1,3 +1,4 @@
+import { shareDisclaimer } from './sharing'
 export async function downloadCard(title: string, score: string, local: boolean): Promise<void> {
   const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1080
   const ctx = canvas.getContext('2d')
@@ -13,9 +14,9 @@ export async function downloadCard(title: string, score: string, local: boolean)
   for (const word of words) { const next = line ? `${line} ${word}` : word; if (ctx.measureText(next).width > 880 && line) { lines.push(line); line = word } else line = next }
   lines.push(line); lines.forEach((value, index) => ctx.fillText(value, 540, 540 + index * 76))
   ctx.font = 'bold 60px sans-serif'; ctx.fillText(score, 540, 750)
-  ctx.font = '24px sans-serif'; ctx.fillText(local ? 'LOCAL PLAYABLE RESULT · UNVERIFIED' : 'KNOWLEDGE QUIZ RESULT', 540, 815)
+  ctx.font = '24px sans-serif'; ctx.fillText(local ? 'KNOWLEDGE SCORE · LOCAL, UNVERIFIED' : 'KNOWLEDGE SCORE', 540, 815)
   ctx.font = '28px Georgia'; ctx.fillText('Three questions. What will you discover?', 540, 910)
-  ctx.font = '19px sans-serif'; ctx.fillText('An educational knowledge quiz. Not a health assessment.', 540, 980)
+  ctx.font = '19px sans-serif'; ctx.fillText(shareDisclaimer, 540, 980)
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Image unavailable')), 'image/png'))
   const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'metaboquest-result.png'; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000)
 }

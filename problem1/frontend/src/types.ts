@@ -1,4 +1,5 @@
 export type QuestionType = 'MYTH_OR_FACT' | 'MULTIPLE_CHOICE' | 'SCENARIO_BASED'
+export type LearningTopic = 'GENERAL' | 'SAFETY' | 'MUSCLE' | 'SIDE_EFFECTS' | 'MAINTENANCE' | 'DIABETES' | 'ELIGIBILITY'
 export type QuestionCategory = 'GLP1_AWARENESS' | 'METABOLIC_HEALTH' | 'TREATMENT_SAFETY' | 'HEALTHY_HABITS' | 'DOCTOR_LED_CARE' | 'NUTRITION'
 export interface Question { id: string; type: QuestionType; category: QuestionCategory; questionText: string; options: { id: string; text: string }[] }
 export interface Session { sessionId: string; questionSetId: string; questionSetVersion: number; totalQuestions: number; status: 'STARTED' | 'COMPLETED' | 'EXPIRED' }
@@ -15,5 +16,5 @@ export interface ConnectedResult { kind: 'connected'; data: SafeResult }
 export type Outcome = LocalResult | ConnectedResult
 export interface Challenge { challengeCode: string; challengeUrl: string; creatorScore: number; expiresAt: string }
 export interface PublicChallenge { challengeCode: string; creatorScore: number; achievement: string; message: string; active: boolean }
-export interface QuizDraft { mode: 'connected' | 'standalone'; sessionId: string; questions: Question[]; answers: Record<string, string>; index: number; startedAt: number; pending?: Submission; challenge?: PublicChallenge }
-export interface ReviewContext { questions: Question[]; answers: Record<string, string>; challenge?: PublicChallenge }
+export interface QuizDraft { topic?: LearningTopic; mode: 'connected' | 'standalone'; sessionId: string; questions: Question[]; answers: Record<string, string>; index: number; checked?: Record<string, boolean>; startedAt: number; pending?: Submission; challenge?: PublicChallenge }
+export interface ReviewContext { topic?: LearningTopic; questions: Question[]; answers: Record<string, string>; challenge?: PublicChallenge }

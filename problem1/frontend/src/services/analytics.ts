@@ -1,7 +1,7 @@
 import { config } from './config'
 import { request } from './api'
 import { storage } from './storage'
-const keys = { GAME_STARTED: ['source', 'platform'], QUESTION_ANSWERED: ['questionId', 'responseTimeMs'], GAME_COMPLETED: ['durationMs'], RESULT_SHARED: ['channel'], FRIEND_CHALLENGE_CREATED: [], FRIEND_CHALLENGE_OPENED: ['challengeCode'], CTA_CLICKED: ['destination'] } as const
+const keys = { GAME_STARTED: ['source', 'platform'], QUESTION_ANSWERED: ['questionId', 'responseTimeMs'], GAME_COMPLETED: ['durationMs'], RESULT_SHARED: ['channel'], FRIEND_CHALLENGE_CREATED: [], FRIEND_CHALLENGE_OPENED: ['challengeCode'], CTA_CLICKED: ['destination', 'ctaContext'], TOPIC_SELECTED: ['topic'] } as const
 export type EventType = keyof typeof keys
 export function track(eventType: EventType, metadata: Record<string, string | number | boolean> = {}, sessionId?: string) {
   if (config.mode !== 'connected' || storage.get('analytics-consent') !== true) return

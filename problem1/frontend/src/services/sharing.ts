@@ -1,3 +1,4 @@
+export const shareDisclaimer = 'Game performance only. Not a diagnosis or treatment recommendation.'
 export async function copyLink(url: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(url); return true } catch { return false }
 }

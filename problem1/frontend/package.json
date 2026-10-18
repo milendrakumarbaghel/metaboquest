@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:playable": "tsc -b && vite build --mode playable --config vite.playable.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:playable": "npm run build:playable && node scripts/verify-playable.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

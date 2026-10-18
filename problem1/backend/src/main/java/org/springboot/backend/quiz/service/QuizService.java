@@ -1,6 +1,7 @@
 package org.springboot.backend.quiz.service;
 
 import org.springboot.backend.common.DomainEnums.SessionStatus;
+import org.springboot.backend.common.DomainEnums.LearningTopic;
 import org.springboot.backend.common.exception.ApiException;
 import org.springboot.backend.common.util.SecureTokenService;
 import org.springboot.backend.config.MetaboQuestProperties;
@@ -15,12 +16,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 public class QuizService {
+    private static final int QUESTIONS_PER_QUIZ = 3;
+    /** Topics used to top up a topic that has fewer than three published questions. */
+    private static final Map<LearningTopic, List<LearningTopic>> RELATED_TOPICS = Map.of(
+            LearningTopic.SAFETY, List.of(LearningTopic.SIDE_EFFECTS, LearningTopic.ELIGIBILITY),
+            LearningTopic.SIDE_EFFECTS, List.of(LearningTopic.SAFETY),
+            LearningTopic.MUSCLE, List.of(LearningTopic.MAINTENANCE, LearningTopic.SAFETY),
+            LearningTopic.MAINTENANCE, List.of(LearningTopic.MUSCLE, LearningTopic.ELIGIBILITY),
+            LearningTopic.DIABETES, List.of(LearningTopic.ELIGIBILITY, LearningTopic.SAFETY),
+            LearningTopic.ELIGIBILITY, List.of(LearningTopic.DIABETES, LearningTopic.SAFETY));
+    private final SecureRandom random = new SecureRandom();
     private final QuestionService questions;
     private final QuizSessionRepository sessions;
     private final QuizAttemptRepository attempts;
@@ -47,19 +59,48 @@ public class QuizService {
     }
 
     @Transactional
-    public StartSessionResponse start() {
+    public StartSessionResponse start(LearningTopic requestedTopic) {
+        LearningTopic topic = requestedTopic == null ? LearningTopic.GENERAL : requestedTopic;
         QuestionSet set = questions.activeSet();
-        int count = questions.publishedQuestions(set.getId()).size();
+        List<QuizQuestion> pool = new ArrayList<>(questions.publishedQuestions(set.getId()));
+        if (pool.size() < QUESTIONS_PER_QUIZ) throw ApiException.notFound("Not enough approved questions are available");
+        Collections.shuffle(pool, random);
+        List<QuizQuestion> selected = new ArrayList<>();
+        if (topic == LearningTopic.GENERAL) {
+            // A general quiz covers different concerns rather than drawing three similar questions.
+            Set<LearningTopic> covered = new HashSet<>();
+            for (QuizQuestion question : pool) {
+                if (covered.add(question.getLearningTopic())) selected.add(question);
+                if (selected.size() == QUESTIONS_PER_QUIZ) break;
+            }
+        } else {
+            // On-topic questions always come first; related topics, then anything published, only top up a thin topic.
+            List<LearningTopic> order = new ArrayList<>(List.of(topic));
+            order.addAll(RELATED_TOPICS.getOrDefault(topic, List.of()));
+            for (LearningTopic candidate : order) {
+                for (QuizQuestion question : pool) {
+                    if (selected.size() == QUESTIONS_PER_QUIZ) break;
+                    if (question.getLearningTopic() == candidate && !selected.contains(question)) selected.add(question);
+                }
+            }
+        }
+        for (QuizQuestion question : pool) {
+            if (selected.size() == QUESTIONS_PER_QUIZ) break;
+            if (!selected.contains(question)) selected.add(question);
+        }
         Instant now = clock.instant();
-        QuizSession session = sessions.save(new QuizSession(UUID.randomUUID(), set, now, now.plus(properties.sessionTtl())));
-        return new StartSessionResponse(session.getId(), set.getId(), set.getVersion(), count, session.getStatus());
+        QuizSession session = new QuizSession(UUID.randomUUID(), set, now, now.plus(properties.sessionTtl()));
+        session.setLearningTopic(topic);
+        session.assignQuestions(selected);
+        sessions.save(session);
+        return new StartSessionResponse(session.getId(), set.getId(), set.getVersion(), session.getQuestions().size(), session.getStatus(), topic);
     }
 
     @Transactional(readOnly = true)
     public QuestionsResponse getQuestions(UUID sessionId) {
         QuizSession session = sessions.findDetailedById(sessionId).orElseThrow(() -> ApiException.notFound("Quiz session not found"));
         ensureUsableForReading(session);
-        List<QuizQuestion> published = questions.publishedQuestions(session.getQuestionSet().getId());
+        List<QuizQuestion> published = session.getQuestions();
         return questions.publicResponse(session.getQuestionSetVersion(), published);
     }
 
@@ -78,11 +119,12 @@ public class QuizService {
             throw ApiException.conflict("This quiz session has already been completed");
         ensureNotExpired(session);
 
-        List<QuizQuestion> published = questions.publishedQuestions(session.getQuestionSet().getId());
+        List<QuizQuestion> published = session.getQuestions();
         Map<UUID, QuizQuestion> byId = published.stream().collect(Collectors.toMap(QuizQuestion::getId, Function.identity()));
         Set<UUID> submittedIds = request.answers().stream().map(AnswerRequest::questionId).collect(Collectors.toSet());
         if (submittedIds.size() != request.answers().size()) throw ApiException.unprocessable("Duplicate question answers are not allowed");
-        if (!submittedIds.equals(byId.keySet())) throw ApiException.unprocessable("All published questions must be answered exactly once");
+        if (published.isEmpty() || !submittedIds.equals(byId.keySet()))
+            throw ApiException.unprocessable("All questions assigned to this session must be answered exactly once");
 
         record Evaluated(QuizQuestion question, QuestionOption option, boolean correct) { }
         List<Evaluated> evaluated = new ArrayList<>();
@@ -143,7 +185,7 @@ public class QuizService {
         }).toList();
         return new QuizResultResponse(attempt.getId(), token, attempt.getScore(), gamification.maximumScore(attempt.getTotalQuestions()),
                 attempt.getCorrectAnswers(), attempt.getTotalQuestions(), gamification.describe(attempt.getProfileType()), feedback,
-                new NextStepResponse("Explore doctor-led metabolic care", "Explore Steer", properties.steerWebsiteUrl()), properties.resultDisclaimer());
+                new NextStepResponse("Want a doctor to look at your own numbers?", "See if the programme fits you", properties.steerWebsiteUrl()), properties.resultDisclaimer());
     }
 
     private void ensureUsableForReading(QuizSession session) {

@@ -46,7 +46,7 @@ public class ChallengeService {
         if (!challenge.isUsable(clock.instant())) throw ApiException.notFound("Challenge has expired or is inactive");
         var profile = gamification.profileFor(challenge.getCreatorScore());
         return new PublicChallengeResponse(code, challenge.getCreatorScore(), gamification.achievement(profile),
-                "Your friend scored " + challenge.getCreatorScore() + " points. Can you beat it?", true);
+                "Your friend's knowledge score is " + challenge.getCreatorScore() + ". Can you beat it?", true);
     }
 
     private String uniqueCode() {

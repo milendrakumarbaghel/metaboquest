@@ -1,0 +1,1 @@
+TODO: Replace this line with the live URL after deploying frontend/ to Vercel (see SUBMISSION.md, "Deploy"). Not deployed yet. Until then, submit playable-ad.html (or playable-ad.zip) as the HTML artifact.

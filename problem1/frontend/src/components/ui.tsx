@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, errorMessage } from '../services/api'
 export function Arrow() { return <span aria-hidden="true">↗</span> }
@@ -14,9 +14,18 @@ export function ErrorNotice({ error, retry }: { error: unknown; retry?: () => vo
   const seconds = Math.max(0, Math.ceil((retryAt - now) / 1000))
   return <div className="error-notice"><p role="alert">{errorMessage(error)}</p>{retry && <button className="button secondary" disabled={seconds > 0} onClick={retry}>{seconds ? `Try again in ${seconds}s` : 'Try again'}</button>}</div>
 }
-export function EmptyState({ title, children }: { title: string; children: ReactNode }) { return <section className="state-panel"><span className="eyebrow">A SMALL DETOUR</span><Icon name="compass" /><h1>{title}</h1><p>{children}</p><Link className="button" to="/play">Play a new quiz <Arrow /></Link></section> }
+export function EmptyState({ title, children }: { title: string; children: ReactNode }) { return <section className="state-panel"><span className="eyebrow">A SMALL DETOUR</span><Icon name="compass" /><h1>{title}</h1><p>{children}</p><Link className="button" to="/topic">Play a new quiz <Arrow /></Link></section> }
+// Keep Tab and Shift+Tab cycling inside the modal instead of escaping to the browser chrome.
+function trapTab(event: KeyboardEvent<HTMLDialogElement>) {
+  if (event.key !== 'Tab') return
+  const items = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+  const first = items[0], end = items[items.length - 1]
+  if (!first || !end) return
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); end.focus() }
+  else if (!event.shiftKey && (document.activeElement === end || !event.currentTarget.contains(document.activeElement))) { event.preventDefault(); first.focus() }
+}
 export function Dialog({ title, children, close }: { title: string; children: ReactNode; close: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; const dialog = ref.current!; dialog.showModal(); return () => { dialog.close(); previous?.focus() } }, [])
-  return <dialog ref={ref} className="dialog" aria-labelledby="dialog-title" onCancel={close} onClick={e => { if (e.target === e.currentTarget) { const box = e.currentTarget.getBoundingClientRect(); if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) close() } }}><div className="dialog-heading"><h2 id="dialog-title">{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={close}>×</button></div>{children}</dialog>
+  return <dialog ref={ref} className="dialog" aria-labelledby="dialog-title" onCancel={close} onKeyDown={trapTab} onClick={e => { if (e.target === e.currentTarget) { const box = e.currentTarget.getBoundingClientRect(); if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) close() } }}><div className="dialog-heading"><h2 id="dialog-title">{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={close}>×</button></div>{children}</dialog>
 }

@@ -28,14 +28,40 @@ async function answerQuiz(user: ReturnType<typeof userEvent.setup>) {
     await screen.findByRole('heading', { name: questionResponse.questions[i].questionText })
     const radios = screen.getAllByRole('radio')
     await user.click(radios[1])
+    await user.click(screen.getByRole('button', { name: /Check answer/ }))
+    await screen.findByRole('heading', { name: /Spot on|Good to know/ })
     if (i < 2) await user.click(screen.getByRole('button', { name: /Next question/ }))
   }
 }
 describe('Connected experience', () => {
+  it('sends only the selected educational topic when starting a new quiz', async () => {
+    const user = userEvent.setup(); mount()
+    await user.click(screen.getByRole('link', { name: /Bust the myths/ }))
+    await user.click(await screen.findByRole('button', { name: /What about side effects\?/ }))
+    await screen.findByRole('heading', { name: questionResponse.questions[0].questionText })
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/sessions')) as unknown as [string, RequestInit]
+    expect(JSON.parse(call[1].body as string)).toEqual({ topic: 'SIDE_EFFECTS' })
+    expect(storage.get('learning-topic')).toBe('SIDE_EFFECTS')
+  })
+
+  it('includes the concern in a doctor checklist only with explicit selection', async () => {
+    const user = userEvent.setup(); storage.set('completed-topic', 'MUSCLE'); mount('/explore')
+    const text = await screen.findByRole('textbox', { name: 'Doctor conversation checklist' })
+    const checkbox = screen.getByRole('checkbox', { name: /Include my chosen topic/ })
+    expect(checkbox).not.toBeChecked()
+    expect((text as HTMLTextAreaElement).value).not.toContain('body-composition')
+    await user.click(checkbox)
+    expect((text as HTMLTextAreaElement).value).toContain('body-composition')
+    await user.click(checkbox)
+    expect((text as HTMLTextAreaElement).value).not.toContain('body-composition')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('starts from the landing CTA, submits exactly once, keeps tokens private and renders backend review', async () => {
     const user = userEvent.setup(); mount()
-    expect(screen.getByRole('heading', { name: 'Think you know metabolic health?' })).toBeVisible()
-    await user.click(screen.getByRole('link', { name: /Let’s play/ }))
+    expect(screen.getByRole('heading', { name: 'GLP-1: how much is fact, and how much is fear?' })).toBeVisible()
+    await user.click(screen.getByRole('link', { name: /Bust the myths/ }))
+    await user.click(await screen.findByRole('link', { name: /Skip, surprise me/ }))
     await answerQuiz(user)
     expect(screen.getByRole('progressbar')).toHaveAttribute('value', '3')
     expect(screen.queryByText(result.feedback[0].explanation)).not.toBeInTheDocument()
@@ -51,7 +77,7 @@ describe('Connected experience', () => {
     expect(document.body.innerHTML).not.toContain(result.resultToken)
     expect(screen.getByText(result.disclaimer)).toBeVisible()
     fireEvent.click(screen.getByText(questionResponse.questions[0].questionText))
-    expect(screen.getByText(result.feedback[0].explanation)).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'What to remember' })).getByText(result.feedback[0].explanation)).toBeVisible()
     expect(screen.getByRole('link', { name: /Prescription Medications/ })).toHaveAttribute('href', result.feedback[0].sources[0].url)
     await user.click(screen.getByRole('button', { name: /Challenge a friend/ }))
     const link = await screen.findByRole('textbox', { name: /Public challenge link/ })
@@ -66,6 +92,7 @@ describe('Connected experience', () => {
     const radios = await screen.findAllByRole('radio')
     act(() => radios[0].focus()); await user.keyboard('[ArrowDown]')
     expect(radios[1]).toBeChecked()
+    await user.click(screen.getByRole('button', { name: /Check answer/ }))
     await user.click(screen.getByRole('button', { name: /Next question/ }))
     await user.click(screen.getByRole('button', { name: /Previous/ }))
     expect(screen.getAllByRole('radio')[1]).toBeChecked()
@@ -133,21 +160,27 @@ describe('Connected experience', () => {
   })
   it('hands off to the configured trusted destination', async () => {
     storage.set('next-step', { ctaText: 'Explore Steer', ctaUrl: 'https://untrusted.example/steer' }); mount('/explore')
-    expect(await screen.findByRole('link', { name: /Explore Steer/ })).toHaveAttribute('href', 'https://steerclub.com')
-    expect(screen.getByRole('link', { name: /Explore Steer/ })).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(await screen.findByRole('link', { name: /See if the programme fits you/ })).toHaveAttribute('href', 'https://steerclub.com')
+    expect(screen.getByRole('link', { name: /See if the programme fits you/ })).toHaveAttribute('rel', 'noopener noreferrer')
   })
   it('requires explicit analytics consent in the accessible privacy dialog', async () => {
     const user = userEvent.setup(); mount(); await user.click(screen.getByRole('button', { name: /Privacy/ }))
     const dialog = screen.getByRole('dialog'); const toggle = within(dialog).getByRole('checkbox')
     expect(toggle).not.toBeChecked(); await user.click(toggle); expect(storage.get('analytics-consent')).toBe(true)
     await user.click(within(dialog).getByRole('button', { name: 'Done' }))
-    await user.click(screen.getByRole('link', { name: /Let’s play/ })); await screen.findAllByRole('radio')
+    await user.click(screen.getByRole('link', { name: /Bust the myths/ })); await user.click(await screen.findByRole('link', { name: /Skip, surprise me/ })); await screen.findAllByRole('radio')
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/analytics/events'))).toBe(true))
   })
 })
 it('completes standalone play without any backend requests and labels the outcome', async () => {
-  config.mode = 'standalone'; const user = userEvent.setup(); mount('/play'); await answerQuiz(user)
-  await user.click(screen.getByRole('button', { name: /See my results/ }))
+  config.mode = 'standalone'; const user = userEvent.setup(); mount('/play')
+  for (let i = 0; i < 3; i++) {
+    await screen.findByText(`Question ${i + 1} of 3`, { selector: '.progress-heading span' })
+    await user.click(screen.getAllByRole('radio')[1])
+    await user.click(screen.getByRole('button', { name: /Check answer/ }))
+    if (i < 2) await user.click(await screen.findByRole('button', { name: /Next question/ }))
+  }
+  await user.click(await screen.findByRole('button', { name: /See my results/ }))
   expect(await screen.findByText('Local playable result · Unverified')).toBeVisible()
   expect(screen.getByText(/Friend challenges are available in connected mode/)).toBeVisible()
   expect(fetchMock).not.toHaveBeenCalled()

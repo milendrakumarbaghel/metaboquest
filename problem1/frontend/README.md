@@ -1,75 +1,47 @@
-# React + TypeScript + Vite
+# MetaboQuest frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A mobile-first quiz about GLP-1 doubts for Steer (Problem Statement 1). React 19, Vite and TypeScript.
+No login. Educational only, not medical advice.
 
-Currently, two official plugins are available:
+## Flow
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Hook (`/`): "GLP-1: how much is fact, and how much is fear?"
+2. Topic (`/topic`): "What makes you unsure about GLP-1?" Seven options: safe, side effects, muscle, weight regain, only for diabetes, even for me, or just curious ("Skip, surprise me"). The topic only picks which questions you see. It is an educational interest, not a medical assessment.
+3. Play (`/play`): three questions. Each has an instant myth-vs-fact explanation with a source link.
+4. Results (`/results/:id`): the topic takeaway first, then the knowledge score, sourced answer review, sharing and friend challenge.
+5. Handoff: a four-step view of how Steer works (diagnostics, doctor consult, continuous care, habits that last) with "See if the programme fits you" and "Talk to a Steer doctor". Also on `/explore`.
 
-## React Compiler
+## Scripts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Run from this folder.
 
-## Expanding the ESLint configuration
+- `npm run dev`: dev server (proxies `/api` to the backend)
+- `npm run build`: type-check and production build
+- `npm run build:playable`: single-file offline build to `dist-playable/index.html`
+- `npx vitest run`: unit tests (`npm test` is watch mode)
+- `npm run lint`
+- `npm run test:e2e`: Playwright (Chrome); starts its own dev server
+- `npm run test:playable`: rebuilds the offline file and checks all seven topic flows with zero network requests
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Environment variables
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+See `.env.example` and [API setup](./API_SETUP.md).
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- `VITE_APP_MODE`: `connected` (default) or `standalone` (offline, bundled questions)
+- `VITE_API_BASE_URL`: backend origin, without `/api`
+- `API_PROXY_TARGET`: local dev proxy target
+- `VITE_STEER_URL`: where the Steer buttons open (default `https://steerclub.com`)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Offline playable
 
-```
+`npm run build:playable` produces one self-contained `dist-playable/index.html` (HashRouter, standalone mode). It needs no server and makes no network requests while playing. Scores in this mode are local and unverified; public friend challenges need the backend. A copy for submission lives in `../submission/`.
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Privacy
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- Nothing from the quiz is sent to Steer. The Steer buttons open `VITE_STEER_URL` (origin and path only) in a new tab: no topic, answers, score, UTM or query string.
+- Analytics is off unless the player opts in. If allowed, the chosen topic name is counted anonymously with gameplay events. It is not added to share text or challenge links.
+- Sharing a topic with Steer would need clear consent and a real handoff mechanism (a form or API). Neither exists today.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Content
 
-```
+Questions and takeaways cite public health sources. They are source-checked, not clinician-reviewed. See `../submission/CONTENT_REVIEW_CHECKLIST.md`.

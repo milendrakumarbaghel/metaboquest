@@ -1,4 +1,4 @@
-import type { Outcome, QuizDraft, Result, ReviewContext, PublicChallenge, Challenge } from '../types'
+import type { LearningTopic, Outcome, QuizDraft, Result, ReviewContext, PublicChallenge, Challenge } from '../types'
 import { api, ApiError } from './api'
 import { config } from './config'
 import { storage, tokenKey } from './storage'
@@ -8,26 +8,35 @@ let starting: Promise<QuizDraft> | undefined
 export function saveDraft(draft: QuizDraft) { storage.set('draft', draft) }
 export function resetQuiz(challenge?: PublicChallenge) {
   storage.remove('draft'); storage.remove('starting-session')
+  storage.remove('learning-topic')
   if (challenge) storage.set('invitation', challenge); else storage.remove('invitation')
 }
+// Tapping a topic is the start action: clear any old quiz, remember the educational interest and (with consent) count it anonymously.
+export function chooseTopic(topic: LearningTopic) {
+  resetQuiz(); storage.set('learning-topic', topic)
+  track('TOPIC_SELECTED', { topic })
+}
+// User-initiated only: never a silent fallback. config.ts reads this flag on the next load.
+export function switchToOfflineEdition() { storage.remove('starting-session'); storage.set('offline-fallback', true) }
 export function startQuiz(): Promise<QuizDraft> {
   const saved = storage.get<QuizDraft>('draft')
   if (saved?.mode === config.mode && saved.questions?.length) return Promise.resolve(saved)
   if (starting) return starting
   starting = (async () => {
+    const topic = storage.get<LearningTopic>('learning-topic') ?? 'GENERAL'
     let sessionId: string
     let questions: QuizDraft['questions']
     if (config.mode === 'standalone') {
       sessionId = `local-${crypto.randomUUID()}`
-      questions = (await import('../data/approved')).questions
+      questions = (await import('../data/approved')).selectQuestions(topic)
     } else {
-      sessionId = storage.get<string>('starting-session') ?? (await api.start()).sessionId
+      sessionId = storage.get<string>('starting-session') ?? (await api.start(topic)).sessionId
       storage.set('starting-session', sessionId)
       const response = await api.questions(sessionId)
       if (!response.questions?.length || response.totalQuestions !== response.questions.length || response.questions.some(q => q.options.length < 2)) throw new ApiError(503)
       questions = response.questions
     }
-    const draft: QuizDraft = { mode: config.mode, sessionId, questions, answers: {}, index: 0, startedAt: Date.now(), challenge: storage.get<PublicChallenge>('invitation') }
+    const draft: QuizDraft = { topic, mode: config.mode, sessionId, questions, answers: {}, index: 0, startedAt: Date.now(), challenge: storage.get<PublicChallenge>('invitation') }
     saveDraft(draft)
     track('GAME_STARTED', { source: draft.challenge ? 'challenge' : 'landing', platform: 'web' }, sessionId)
     return draft
@@ -42,8 +51,9 @@ export function retainResult(result: Result): Outcome {
   return outcome
 }
 export async function completeQuiz(draft: QuizDraft): Promise<Outcome> {
-  const outcome = config.mode === 'standalone' ? (await import('../data/approved')).scoreLocal(draft.answers) : retainResult(await api.submit(draft.pending!))
-  const context: ReviewContext = { questions: draft.questions, answers: draft.answers, challenge: draft.challenge }
+  const outcome = config.mode === 'standalone' ? (await import('../data/approved')).scoreLocal(draft.answers, draft.questions) : retainResult(await api.submit(draft.pending!))
+  const context: ReviewContext = { topic: draft.topic, questions: draft.questions, answers: draft.answers, challenge: draft.challenge }
+  storage.set('completed-topic', draft.topic ?? 'GENERAL')
   storage.set(`review:${outcome.data.attemptId}`, context)
   if (outcome.kind === 'local') storage.set(`local-result:${outcome.data.attemptId}`, outcome)
   results.set(outcome.data.attemptId, outcome)

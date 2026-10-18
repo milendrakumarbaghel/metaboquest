@@ -37,7 +37,7 @@ class QuizServiceTest {
         when(session.getQuestionSet()).thenReturn(set);
         when(set.getId()).thenReturn(UUID.randomUUID());
         when(question.getId()).thenReturn(questionId);
-        when(questionService.publishedQuestions(set.getId())).thenReturn(List.of(question));
+        when(session.getQuestions()).thenReturn(List.of(question));
         var properties = new MetaboQuestProperties("https://play.example", "https://steerclub.com", "https://play.example",
                 Duration.ofMinutes(30), Period.ofDays(14), "disclaimer");
         var service = new QuizService(questionService, sessions, attempts, mock(QuizAnswerRepository.class),

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-glp1-topic-first-quiz",
+  "task_description": "Improve MetaboQuest (Steer hackathon Problem Statement 1 only): GLP-1 curiosity hook, optional topic-first flow with guaranteed topic-relevant questions (backend + offline), instant myth-vs-fact feedback, per-topic key takeaway, Indian context throughout, source-verified content with a clinician review checklist, non-pushy four-step Steer handoff that sends no user data, and a submission-ready pack. Full plan: /Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/frontend/.agents/tasks/plan.md",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

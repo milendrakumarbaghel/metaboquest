@@ -1,0 +1,36 @@
+{
+  "verdict": "APPROVED",
+  "summary": "Re-ran verification independently: ./mvnw test (25 tests, BUILD SUCCESS), tsc -b, npm run lint (clean), npx vitest run (36 pass), npm run build, npm run test:e2e (4/4), npm run test:playable (all 7 topics offline, zero network requests). The 36th vitest case is the existing it.each over topics gaining the new DIABETES topic, not a new test. No commits were made (HEAD still b9eea75). V1-V8 and glp1-question-bank.json were not touched (mtimes predate V9); V9 is additive. Banned-string scan over frontend/src (non-test), V9 bank text/options/explanations/source titles, and the submission, frontend and backend docs is clean. The only drug-name hits are the frozen V8 source title 'Semaglutide' (retitled by V9 and in the frontend) and nhs.uk URL strings. The flow is Hook -> /topic (7 doubts plus 'Skip, surprise me') -> /play -> results. Backend start(topic) gives on-topic questions first and tops up from related topics only when needed, and the frontend and offline paths mirror it. All 6 topic pools have at least 6 active questions. Instant 'Check answer' feedback is text-based ('Spot on' / 'Good to know'), has a streak chip and n/3 markers, and uses aria-live. The key takeaway renders before the score card, with a takeaway h2 at least as large as the score h1. The Steer handoff has the four steps verbatim and the two CTAs 'See if the programme fits you' / 'Talk to a Steer doctor'. Links use target=_blank rel=noopener noreferrer and the bare origin+path, with no topic or personal data. CTA_CLICKED carries ctaContext, and TOPIC_SELECTED carries only the topic, behind opt-in consent. The share disclaimer is exact in the share text and PNG. VITE_STEER_URL is documented in .env.example, README and API_SETUP. contentReview.reviewedBy is null, with no 'medically reviewed' claims anywhere. CONTENT_REVIEW_CHECKLIST.md has 37 active rows, the retired ids, 7 takeaways and the Steer claims, with every sign-off column empty. The submission pack is complete: playable-ad.html is byte-identical to a freshly rebuilt dist-playable/index.html, playable-ad.zip holds only index.html, one-liners.md is present, demo and loom links are TODO placeholders, and there are no fabricated URLs. I found no secrets. Only minor polish items remain, listed in findings.",
+  "findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/frontend/src/pages/Play.tsx",
+      "issue": "The quiz aside still says 'We'll explore the science together after your final answer.' Explanations now appear after every question, so this copy is stale and undersells the instant myth-vs-fact feedback.",
+      "fix": "Reword the aside to something like 'Check each answer to see the myth-vs-fact explanation straight away.'"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/backend/src/main/resources/data/glp1-topic-bank-v9.json",
+      "issue": "Indian context is strong in the new questions but is not guaranteed per quiz. MAINTENANCE has 4 of 6 generic legacy questions (3, 8, 9, 17), so about 20% of MAINTENANCE quizzes could show no Indian-context question. ELIGIBILITY (19, 21, 37, 38, 40) is similarly light. Takeaways do carry local context.",
+      "fix": "Optional: in a later content pass (with the clinician review), add an Indian food or routine framing to one or two of the generic MAINTENANCE and ELIGIBILITY questions."
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/submission/CONTENT_REVIEW_CHECKLIST.md",
+      "issue": "In the 'Steer journey claims' table, the Notes column repeats 'Not a claim that every test is indicated for every person' on every row, including rows where it is irrelevant (for example the 'doctor-led metabolic health club' and 'nothing is sent to Steer' rows).",
+      "fix": "Keep that note only on the Diagnostics row and clear or specialise it on the other rows."
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/problem1/frontend/src/components/TopicTakeaway.tsx",
+      "issue": "On Results, the takeaway h2 now precedes the score card h1, which inverts the heading outline for screen-reader heading navigation. It is intentional for prominence.",
+      "fix": "Optional: make the takeaway the page h1 and demote the profile title to h2, keeping the visual sizes."
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/milendrakumarbaghel/Documents/Hackathon/metaboquest/.DS_Store",
+      "issue": "Untracked .DS_Store files (repo root, problem1/, backend/, backend/src/) sit in the working tree and could be swept into a later 'git add'.",
+      "fix": "Add .DS_Store to the root .gitignore, or delete the files, before the user commits."
+    }
+  ]
+}
