@@ -1,6 +1,9 @@
 export const demo = new URLSearchParams(window.location.search).get('demo') === 'true'
-const base = (import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? 'https://metaboquest-problem2-backend.onrender.com' : '')).replace(/\/$/, '')
-const keys = { pipeline: import.meta.env.VITE_PIPELINE_API_KEY || 'demo-pipeline-key', review: import.meta.env.VITE_REVIEW_API_KEY || 'demo-review-key' }
+const base = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://metaboquest-problem2-backend.onrender.com' : '')).replace(/\/$/, '')
+const keys: Record<'pipeline' | 'review', string> = {
+  pipeline: (import.meta.env.VITE_PIPELINE_API_KEY || 'demo-pipeline-key').trim(),
+  review: (import.meta.env.VITE_REVIEW_API_KEY || 'demo-review-key').trim()
+}
 export class ApiError extends Error {
   status: number
   constructor(message: string, status = 0) { super(message); this.name = 'ApiError'; this.status = status }
@@ -13,7 +16,8 @@ export function safeLink(value: string | undefined): string | undefined {
 }
 export async function request<T>(path: string, options: RequestInit = {}, auth: 'pipeline' | 'review' | 'none' = 'pipeline'): Promise<T> {
   if (demo) return (await import('../mockData')).demoRequest<T>(path, options)
-  if (auth !== 'none' && !keys[auth]) throw new ApiError(`Configure VITE_${auth.toUpperCase()}_API_KEY in .env.local and restart Vite.`, 401)
+  const apiKey = auth !== 'none' ? (keys[auth] || (auth === 'review' ? 'demo-review-key' : 'demo-pipeline-key')) : ''
+  if (auth !== 'none' && !apiKey) throw new ApiError(`Configure VITE_${auth.toUpperCase()}_API_KEY in .env.local and restart Vite.`, 401)
   const controller = new AbortController()
   const abort = () => controller.abort()
   if (options.signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
@@ -21,7 +25,7 @@ export async function request<T>(path: string, options: RequestInit = {}, auth: 
   const timeout = window.setTimeout(abort, 120000)
   try {
     const headers = new Headers(options.headers)
-    if (auth !== 'none') headers.set('X-API-Key', keys[auth])
+    if (auth !== 'none') headers.set('X-API-Key', apiKey)
     headers.set('Accept', 'application/json')
     const response = await fetch(apiUrl(path), { ...options, headers, signal: controller.signal, credentials: 'omit' })
     window.dispatchEvent(new CustomEvent('studio-connectivity', { detail: true }))

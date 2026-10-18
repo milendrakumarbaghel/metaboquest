@@ -3,7 +3,7 @@ const mode = import.meta.env.VITE_APP_MODE ?? 'connected'
 if (mode !== 'connected' && mode !== 'standalone') throw new Error('VITE_APP_MODE must be connected or standalone')
 export const config = {
   mode: (storage.get('offline-fallback') === true ? 'standalone' : mode) as 'connected' | 'standalone',
-  apiBase: (import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? 'https://metaboquest-problem1-backendxx.onrender.com' : '')).replace(/\/$/, ''),
+  apiBase: (import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://metaboquest-problem1-backendxx.onrender.com' : '')).replace(/\/$/, ''),
   steerUrl: import.meta.env.VITE_STEER_URL || 'https://steerclub.com',
 }
 export function safeUrl(value: string, allowLocal = false): string | undefined {
